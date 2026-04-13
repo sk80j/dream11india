@@ -125,7 +125,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun Dream11App(activity: ComponentActivity) {
-    var screen by remember { mutableStateOf("splash") }
+    val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    var screen by remember { mutableStateOf(if (firebaseUser != null) "main" else "splash") }
     var phone by remember { mutableStateOf("") }
     var vid by remember { mutableStateOf("") }
     var tab by remember { mutableStateOf("home") }
@@ -285,8 +286,12 @@ fun SplashScreen(onFinish: () -> Unit) {
                 .size(130.dp).clip(CircleShape).background(D11Red)
                 .border(3.dp, D11White, CircleShape),
                 contentAlignment = Alignment.Center) {
-                Text("D11", color = D11White, fontSize = 40.sp,
-                    fontWeight = FontWeight.ExtraBold)
+
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo),
+                    contentDescription = "Logo",
+                    modifier = Modifier.size(130.dp)
+                )
             }
             Spacer(modifier = Modifier.height(24.dp))
             Column(modifier = Modifier.alpha(textAlpha.value),
@@ -323,11 +328,13 @@ fun LanguageScreen(onSelect: (Boolean) -> Unit) {
         contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.size(100.dp).clip(CircleShape).background(D11Red)
-                .border(3.dp, D11White, CircleShape),
+            Box(modifier = Modifier.size(100.dp),
                 contentAlignment = Alignment.Center) {
-                Text("D11", color = D11White, fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold)
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo),
+                    contentDescription = "Logo",
+                    modifier = Modifier.size(100.dp)
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text("DREAM11 INDIA", color = D11White, fontSize = 22.sp,
@@ -366,11 +373,13 @@ fun PhoneScreen(activity: ComponentActivity, onOtpSent: (String, String) -> Unit
         Box(modifier = Modifier.fillMaxWidth().background(D11Red).padding(vertical = 32.dp),
             contentAlignment = Alignment.Center) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(52.dp).clip(CircleShape).background(D11White)
-                    .border(2.dp, D11Red, CircleShape),
+                Box(modifier = Modifier.size(52.dp),
                     contentAlignment = Alignment.Center) {
-                    Text("D11", color = D11Red, fontSize = 14.sp,
-                        fontWeight = FontWeight.ExtraBold)
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo),
+                        contentDescription = "Logo",
+                        modifier = Modifier.size(52.dp)
+                    )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
@@ -538,3 +547,6 @@ fun CountdownTimer(hoursLeft: Int, minutesLeft: Int) {
             color = timeColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
+
+
+

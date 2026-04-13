@@ -1,4 +1,4 @@
-package com.example.dream11india
+﻿package com.example.dream11india
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -79,7 +79,7 @@ fun WalletScreen(
                         ))
                     }
                     if (transactions.isEmpty()) {
-                        transactions.add(Transaction("Welcome Bonus", "+₹0", "Today", true))
+                        transactions.add(Transaction("Welcome Bonus", "+â‚¹0", "Today", true))
                     }
                 }
         }
@@ -96,7 +96,7 @@ fun WalletScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("←", color = D11White, fontSize = 24.sp,
+            Text("â†", color = D11White, fontSize = 24.sp,
                 modifier = Modifier.clickable { onBack() })
             Spacer(modifier = Modifier.width(12.dp))
             Text("My Balance", color = D11White, fontSize = 18.sp,
@@ -123,7 +123,7 @@ fun WalletScreen(
                         ) {
                             Column {
                                 Text("Current Balance", color = Color(0xFF666666), fontSize = 13.sp)
-                                Text("₹${userData.balance}", color = D11Green,
+                                Text("â‚¹${userData.balance}", color = D11Green,
                                     fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
                             }
                             Button(
@@ -143,14 +143,14 @@ fun WalletScreen(
                         ) {
                             Column {
                                 Text("Amount Unutilised", color = Color(0xFF666666), fontSize = 12.sp)
-                                Text("₹0", color = Color(0xFF111111), fontSize = 16.sp,
+                                Text("â‚¹0", color = Color(0xFF111111), fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold)
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 Text("Winnings", color = Color(0xFF666666), fontSize = 12.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("₹${userData.winnings}", color = Color(0xFF111111),
+                                    Text("â‚¹${userData.winnings}", color = Color(0xFF111111),
                                         fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                     if (userData.winnings > 0) {
                                         Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
@@ -181,11 +181,11 @@ fun WalletScreen(
                         HorizontalDivider(color = Color(0xFFEEEEEE))
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        listOf("💎" to "DreamCoins Balance",
-                            "📋" to "My Transactions",
-                            "💳" to "Manage Payments",
-                            "👤" to "My KYC Details",
-                            "🎁" to "Invite & Collect"
+                        listOf("ðŸ’Ž" to "DreamCoins Balance",
+                            "ðŸ“‹" to "My Transactions",
+                            "ðŸ’³" to "Manage Payments",
+                            "ðŸ‘¤" to "My KYC Details",
+                            "ðŸŽ" to "Invite & Collect"
                         ).forEach { (icon, title) ->
                             Row(modifier = Modifier.fillMaxWidth().clickable {}
                                 .padding(vertical = 8.dp),
@@ -223,7 +223,7 @@ fun WalletScreen(
                                         .background(if (addAmount == amt) D11Red else D11LightGray)
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
                                         .clickable { addAmount = amt }) {
-                                        Text("₹$amt", color = D11White, fontSize = 13.sp,
+                                        Text("â‚¹$amt", color = D11White, fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold)
                                     }
                                 }
@@ -258,7 +258,7 @@ fun WalletScreen(
                                 modifier = Modifier.fillMaxWidth().height(48.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = D11Green),
                                 shape = RoundedCornerShape(8.dp)
-                            ) { Text("📱 Show QR & Pay", fontWeight = FontWeight.ExtraBold) }
+                            ) { Text("ðŸ“± Show QR & Pay", fontWeight = FontWeight.ExtraBold) }
                         }
                     }
                 }
@@ -274,7 +274,7 @@ fun WalletScreen(
                             Text("Scan & Pay", color = D11White, fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Amount: ₹$pendingAmount", color = D11Yellow,
+                            Text("Amount: â‚¹$pendingAmount", color = D11Yellow,
                                 fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -283,15 +283,15 @@ fun WalletScreen(
                                 .background(D11White).padding(16.dp),
                                 contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("█▀▀▀█ ▄ █▀▀▀█", color = D11Black,
+                                    Text("â–ˆâ–€â–€â–€â–ˆ â–„ â–ˆâ–€â–€â–€â–ˆ", color = D11Black,
                                         fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    Text("█ ▄ █ █ █ ▄ █", color = D11Black,
+                                    Text("â–ˆ â–„ â–ˆ â–ˆ â–ˆ â–„ â–ˆ", color = D11Black,
                                         fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    Text("█▄▄▄█ ▄ █▄▄▄█", color = D11Black,
+                                    Text("â–ˆâ–„â–„â–„â–ˆ â–„ â–ˆâ–„â–„â–„â–ˆ", color = D11Black,
                                         fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    Text("▄▄▄ ▀█▀ ▄▄▀▄▀", color = D11Black, fontSize = 14.sp)
-                                    Text("▀▄▀█▄▄▀ █▀▀▀▄", color = D11Black, fontSize = 14.sp)
-                                    Text("█▀▀▀█ ▀▄█▄▀▄▀", color = D11Black, fontSize = 14.sp)
+                                    Text("â–„â–„â–„ â–€â–ˆâ–€ â–„â–„â–€â–„â–€", color = D11Black, fontSize = 14.sp)
+                                    Text("â–€â–„â–€â–ˆâ–„â–„â–€ â–ˆâ–€â–€â–€â–„", color = D11Black, fontSize = 14.sp)
+                                    Text("â–ˆâ–€â–€â–€â–ˆ â–€â–„â–ˆâ–„â–€â–„â–€", color = D11Black, fontSize = 14.sp)
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text("UPI QR Code", color = D11Black, fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold)
@@ -302,7 +302,7 @@ fun WalletScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Text("UPI ID: $upiId", color = D11Gray, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("₹$pendingAmount pay karo aur\nscreenshot upload karo",
+                            Text("â‚¹$pendingAmount pay karo aur\nscreenshot upload karo",
                                 color = D11Gray, fontSize = 12.sp, textAlign = TextAlign.Center)
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -322,7 +322,7 @@ fun WalletScreen(
                                                 .clip(RoundedCornerShape(8.dp)),
                                             contentScale = ContentScale.Fit)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Text("✅ Screenshot selected!",
+                                        Text("âœ… Screenshot selected!",
                                             color = D11Green, fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold)
                                         Text("Change karne ke liye tap karo",
@@ -330,7 +330,7 @@ fun WalletScreen(
                                     }
                                 } else {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("📸", fontSize = 40.sp)
+                                        Text("ðŸ“¸", fontSize = 40.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text("Payment Screenshot Upload Karo",
                                             color = D11White, fontSize = 14.sp,
@@ -344,7 +344,7 @@ fun WalletScreen(
                             if (uploadStatus.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(uploadStatus,
-                                    color = if (uploadStatus.contains("✅")) D11Green else D11Red,
+                                    color = if (uploadStatus.contains("âœ…")) D11Green else D11Red,
                                     fontSize = 13.sp, textAlign = TextAlign.Center)
                             }
 
@@ -353,11 +353,11 @@ fun WalletScreen(
                             Button(
                                 onClick = {
                                     if (selectedImageUri == null) {
-                                        uploadStatus = "❌ Pehle screenshot select karo!"
+                                        uploadStatus = "âŒ Pehle screenshot select karo!"
                                         return@Button
                                     }
                                     isUploading = true
-                                    uploadStatus = "⏳ Uploading..."
+                                    uploadStatus = "â³ Uploading..."
                                     val uid = currentUser?.uid ?: return@Button
                                     val fileName = "payments/${uid}_${System.currentTimeMillis()}.jpg"
                                     val storageRef = storage.reference.child(fileName)
@@ -376,11 +376,11 @@ fun WalletScreen(
                                                 db.collection("transactions").add(mapOf(
                                                     "userId" to uid,
                                                     "title" to "Payment Pending",
-                                                    "amount" to "₹$pendingAmount",
+                                                    "amount" to "â‚¹$pendingAmount",
                                                     "date" to "Today",
                                                     "isCredit" to false
                                                 ))
-                                                uploadStatus = "✅ Submit ho gaya! Admin approve karega."
+                                                uploadStatus = "âœ… Submit ho gaya! Admin approve karega."
                                                 isUploading = false
                                                 showPendingMsg = true
                                                 showQR = false
@@ -388,7 +388,7 @@ fun WalletScreen(
                                             }
                                         }
                                         .addOnFailureListener {
-                                            uploadStatus = "❌ Upload failed! Try again."
+                                            uploadStatus = "âŒ Upload failed! Try again."
                                             isUploading = false
                                         }
                                 },
@@ -401,7 +401,7 @@ fun WalletScreen(
                             ) {
                                 if (isUploading) CircularProgressIndicator(color = D11White,
                                     modifier = Modifier.size(24.dp))
-                                else Text("🚀 SUBMIT PAYMENT",
+                                else Text("ðŸš€ SUBMIT PAYMENT",
                                     fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
                             }
                         }
@@ -417,7 +417,7 @@ fun WalletScreen(
                         Row(modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("⏳", fontSize = 32.sp)
+                            Text("â³", fontSize = 32.sp)
                             Column {
                                 Text("Payment Under Review", color = D11White,
                                     fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -465,7 +465,7 @@ fun WalletScreen(
                                             db.collection("transactions").add(mapOf(
                                                 "userId" to uid,
                                                 "title" to "Withdrawal",
-                                                "amount" to "-₹$amt",
+                                                "amount" to "-â‚¹$amt",
                                                 "date" to "Today",
                                                 "isCredit" to false))
                                         }
@@ -503,7 +503,7 @@ fun WalletScreen(
                                 .background(if (txn.isCredit) Color(0xFF004D00)
                                 else Color(0xFF4D0000)),
                                 contentAlignment = Alignment.Center) {
-                                Text(if (txn.isCredit) "↑" else "↓",
+                                Text(if (txn.isCredit) "â†‘" else "â†“",
                                     color = if (txn.isCredit) D11Green else D11Red,
                                     fontSize = 20.sp, fontWeight = FontWeight.Bold)
                             }

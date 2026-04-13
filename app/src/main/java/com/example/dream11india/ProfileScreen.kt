@@ -1,4 +1,4 @@
-package com.example.dream11india
+﻿package com.example.dream11india
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -65,13 +65,17 @@ fun ProfileScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("←", color = D11White, fontSize = 24.sp,
+                Text("â†", color = D11White, fontSize = 24.sp,
                     modifier = Modifier.clickable { onBack() })
                 Spacer(modifier = Modifier.width(12.dp))
+                androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo), contentDescription = "Logo", modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo), contentDescription = "Logo", modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("My Profile", color = D11White, fontSize = 18.sp,
                     fontWeight = FontWeight.Bold)
             }
-            Text("✏️ Edit", color = D11White, fontSize = 14.sp,
+            Text("âœï¸ Edit", color = D11White, fontSize = 14.sp,
                 modifier = Modifier.clickable { showEditName = !showEditName })
         }
 
@@ -158,7 +162,7 @@ fun ProfileScreen(
                                     .background(Color(0xFF004D00))
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
                             ) {
-                                Text("✓ Verified", color = D11Green, fontSize = 12.sp,
+                                Text("âœ“ Verified", color = D11Green, fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold)
                             }
                         }
@@ -178,9 +182,9 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        "💰" to "Balance" to "₹${userData.balance}",
-                        "🏆" to "Winnings" to "₹${userData.winnings}",
-                        "🏏" to "Matches" to "${userData.matchesPlayed}"
+                        "ðŸ’°" to "Balance" to "â‚¹${userData.balance}",
+                        "ðŸ†" to "Winnings" to "â‚¹${userData.winnings}",
+                        "ðŸ" to "Matches" to "${userData.matchesPlayed}"
                     ).forEach { (iconLabel, value) ->
                         val (icon, label) = iconLabel
                         Card(
@@ -214,9 +218,9 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("🎁 Refer & Earn", color = D11White, fontSize = 14.sp,
+                            Text("ðŸŽ Refer & Earn", color = D11White, fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold)
-                            Text("Dost ko invite karo — dono ko bonus!",
+                            Text("Dost ko invite karo â€” dono ko bonus!",
                                 color = D11Gray, fontSize = 12.sp)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("Code: D11${userData.phone.takeLast(4)}",
@@ -245,12 +249,12 @@ fun ProfileScreen(
                 ) {
                     Column {
                         listOf(
-                            "🔔" to "Notifications",
-                            "🔒" to "Privacy & Security",
-                            "📞" to "Contact Support",
-                            "⭐" to "Rate the App",
-                            "📋" to "Terms & Conditions",
-                            "ℹ️" to "About Dream11 India"
+                            "ðŸ””" to "Notifications",
+                            "ðŸ”’" to "Privacy & Security",
+                            "ðŸ“ž" to "Contact Support",
+                            "â­" to "Rate the App",
+                            "ðŸ“‹" to "Terms & Conditions",
+                            "â„¹ï¸" to "About Dream11 India"
                         ).forEachIndexed { index, (icon, title) ->
                             Row(
                                 modifier = Modifier.fillMaxWidth()
@@ -266,7 +270,7 @@ fun ProfileScreen(
                                     Text(icon, fontSize = 18.sp)
                                     Text(title, color = D11White, fontSize = 14.sp)
                                 }
-                                Text("→", color = D11Gray, fontSize = 16.sp)
+                                Text("â†’", color = D11Gray, fontSize = 16.sp)
                             }
                             if (index < 5) {
                                 HorizontalDivider(color = D11Border, thickness = 0.5.dp)
@@ -285,7 +289,7 @@ fun ProfileScreen(
                         containerColor = Color(0xFF330000)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("🚪 LOGOUT", color = D11Red, fontWeight = FontWeight.ExtraBold,
+                    Text("ðŸšª LOGOUT", color = D11Red, fontWeight = FontWeight.ExtraBold,
                         fontSize = 15.sp)
                 }
             }
@@ -294,3 +298,4 @@ fun ProfileScreen(
         }
     }
 }
+

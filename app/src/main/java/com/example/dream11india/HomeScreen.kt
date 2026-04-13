@@ -1,4 +1,4 @@
-package com.example.dream11india
+﻿package com.example.dream11india
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,95 +38,123 @@ fun HomeScreen(
     var errorMsg by remember { mutableStateOf("") }
     var selectedLeague by remember { mutableStateOf("All") }
 
+    val sampleMatches = listOf(
+        CricMatch(
+            id = "1", name = "RR vs MI",
+            status = "Rajasthan Royals need 45 runs in 30 balls",
+            venue = "Sawai Mansingh Stadium, Jaipur",
+            date = "2026-04-13",
+            teams = listOf("Rajasthan Royals", "Mumbai Indians"),
+            score = listOf(
+                Score(186, 5, 20.0, "MI Innings"),
+                Score(142, 3, 14.0, "RR Innings")
+            ),
+            matchStarted = true, matchEnded = false
+        ),
+        CricMatch(
+            id = "2", name = "CSK vs RCB",
+            status = "Today, 7:30 PM",
+            venue = "MA Chidambaram Stadium, Chennai",
+            date = "2026-04-13",
+            teams = listOf("Chennai Super Kings", "Royal Challengers"),
+            matchStarted = false, matchEnded = false
+        ),
+        CricMatch(
+            id = "3", name = "KKR vs DC",
+            status = "Tomorrow, 3:30 PM",
+            venue = "Eden Gardens, Kolkata",
+            date = "2026-04-14",
+            teams = listOf("Kolkata Knight Riders", "Delhi Capitals"),
+            matchStarted = false, matchEnded = false
+        ),
+        CricMatch(
+            id = "4", name = "PBKS vs SRH",
+            status = "Tomorrow, 7:30 PM",
+            venue = "Punjab Cricket Association Stadium, Mohali",
+            date = "2026-04-14",
+            teams = listOf("Punjab Kings", "Sunrisers Hyderabad"),
+            matchStarted = false, matchEnded = false
+        ),
+        CricMatch(
+            id = "5", name = "GT vs LSG",
+            status = "15 Apr, 7:30 PM",
+            venue = "Narendra Modi Stadium, Ahmedabad",
+            date = "2026-04-15",
+            teams = listOf("Gujarat Titans", "Lucknow Super Giants"),
+            matchStarted = false, matchEnded = false
+        ),
+        CricMatch(
+            id = "6", name = "MI vs CSK",
+            status = "16 Apr, 7:30 PM",
+            venue = "Wankhede Stadium, Mumbai",
+            date = "2026-04-16",
+            teams = listOf("Mumbai Indians", "Chennai Super Kings"),
+            matchStarted = false, matchEnded = false
+        )
+    )
+
+    fun parseCricbuzzMatches(response: CricbuzzMatchListResponse): List<CricMatch> {
+        val allMatches = mutableListOf<CricMatch>()
+        response.typeMatches?.forEach { typeMatch ->
+            typeMatch.seriesMatches?.forEach { sw ->
+                val wrapper = sw.seriesAdWrapper ?: return@forEach
+                wrapper.matches?.forEach { cbMatch ->
+                    val info = cbMatch.matchInfo ?: return@forEach
+                    allMatches.add(CricMatch(
+                        id = info.matchId.toString(),
+                        name = "${info.team1?.teamSName ?: "T1"} vs ${info.team2?.teamSName ?: "T2"}",
+                        status = info.status,
+                        venue = "${info.venueInfo?.ground ?: ""}, ${info.venueInfo?.city ?: ""}",
+                        date = info.startDate,
+                        teams = listOf(
+                            info.team1?.teamName ?: "Team 1",
+                            info.team2?.teamName ?: "Team 2"
+                        ),
+                        teamInfo = listOf(
+                            TeamInfo(
+                                name = info.team1?.teamName ?: "",
+                                shortname = info.team1?.teamSName ?: "",
+                                img = "https://cricbuzz-cricket.p.rapidapi.com/img/v1/i1/c${info.team1?.imageId}/i.jpg"
+                            ),
+                            TeamInfo(
+                                name = info.team2?.teamName ?: "",
+                                shortname = info.team2?.teamSName ?: "",
+                                img = "https://cricbuzz-cricket.p.rapidapi.com/img/v1/i1/c${info.team2?.imageId}/i.jpg"
+                            )
+                        ),
+                        score = cbMatch.matchScore?.let { ms ->
+                            listOfNotNull(
+                                ms.team1Score?.inngs1?.let { Score(it.runs, it.wickets, it.overs, "1st") },
+                                ms.team2Score?.inngs1?.let { Score(it.runs, it.wickets, it.overs, "2nd") }
+                            )
+                        },
+                        matchStarted = info.state == "In Progress",
+                        matchEnded = info.state == "Complete"
+                    ))
+                }
+            }
+        }
+        return allMatches
+    }
+
     LaunchedEffect(Unit) {
         scope.launch {
             try {
                 val allMatches = mutableListOf<CricMatch>()
-
-                // Live matches
                 try {
                     val liveResp = CricbuzzApi.service.getLiveMatches()
-                    liveResp.typeMatches?.forEach { typeMatch ->
-                        typeMatch.seriesMatches?.forEach { sw ->
-                            sw.seriesAdWrapper?.matches?.forEach { cbMatch ->
-                                val info = cbMatch.matchInfo ?: return@forEach
-                                allMatches.add(CricMatch(
-                                    id = info.matchId.toString(),
-                                    name = "${info.team1?.teamSName} vs ${info.team2?.teamSName}",
-                                    status = info.status,
-                                    venue = "${info.venueInfo?.ground}, ${info.venueInfo?.city}",
-                                    date = info.startDate,
-                                    teams = listOf(
-                                        info.team1?.teamName ?: "Team 1",
-                                        info.team2?.teamName ?: "Team 2"
-                                    ),
-                                    teamInfo = listOf(
-                                        TeamInfo(
-                                            name = info.team1?.teamName ?: "",
-                                            shortname = info.team1?.teamSName ?: "",
-                                            img = "https://cricbuzz-cricket.p.rapidapi.com/img/v1/i1/c${info.team1?.imageId}/i.jpg"
-                                        ),
-                                        TeamInfo(
-                                            name = info.team2?.teamName ?: "",
-                                            shortname = info.team2?.teamSName ?: "",
-                                            img = "https://cricbuzz-cricket.p.rapidapi.com/img/v1/i1/c${info.team2?.imageId}/i.jpg"
-                                        )
-                                    ),
-                                    score = cbMatch.matchScore?.let { ms ->
-                                        listOfNotNull(
-                                            ms.team1Score?.inngs1?.let { Score(it.runs, it.wickets, it.overs, "1st") },
-                                            ms.team2Score?.inngs1?.let { Score(it.runs, it.wickets, it.overs, "2nd") }
-                                        )
-                                    },
-                                    matchStarted = info.state == "In Progress",
-                                    matchEnded = info.state == "Complete"
-                                ))
-                            }
-                        }
-                    }
-                } catch (e: Exception) { }
-
-                // Upcoming matches
-                try {
+                    allMatches.addAll(parseCricbuzzMatches(liveResp))
                     val upcomingResp = CricbuzzApi.service.getUpcomingMatches()
-                    upcomingResp.typeMatches?.forEach { typeMatch ->
-                        typeMatch.seriesMatches?.forEach { sw ->
-                            sw.seriesAdWrapper?.matches?.forEach { cbMatch ->
-                                val info = cbMatch.matchInfo ?: return@forEach
-                                allMatches.add(CricMatch(
-                                    id = info.matchId.toString(),
-                                    name = "${info.team1?.teamSName} vs ${info.team2?.teamSName}",
-                                    status = info.status,
-                                    venue = "${info.venueInfo?.ground}, ${info.venueInfo?.city}",
-                                    date = info.startDate,
-                                    teams = listOf(
-                                        info.team1?.teamName ?: "Team 1",
-                                        info.team2?.teamName ?: "Team 2"
-                                    ),
-                                    teamInfo = listOf(
-                                        TeamInfo(
-                                            name = info.team1?.teamName ?: "",
-                                            shortname = info.team1?.teamSName ?: "",
-                                            img = "https://cricbuzz-cricket.p.rapidapi.com/img/v1/i1/c${info.team1?.imageId}/i.jpg"
-                                        ),
-                                        TeamInfo(
-                                            name = info.team2?.teamName ?: "",
-                                            shortname = info.team2?.teamSName ?: "",
-                                            img = "https://cricbuzz-cricket.p.rapidapi.com/img/v1/i1/c${info.team2?.imageId}/i.jpg"
-                                        )
-                                    ),
-                                    matchStarted = false,
-                                    matchEnded = false
-                                ))
-                            }
-                        }
-                    }
+                    allMatches.addAll(parseCricbuzzMatches(upcomingResp))
                 } catch (e: Exception) { }
 
+                if (allMatches.isEmpty()) {
+                    allMatches.addAll(sampleMatches)
+                }
                 matches = allMatches
                 isLoading = false
             } catch (e: Exception) {
-                errorMsg = "Matches load nahi hue: ${e.message}"
+                matches = sampleMatches
                 isLoading = false
             }
         }
@@ -159,14 +187,11 @@ fun HomeScreen(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(
-                            modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .background(D11Red),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("D", color = D11White, fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold)
-                        }
+                        androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo),
+                        contentDescription = "Logo",
+                        modifier = Modifier.size(36.dp)
+                    )
                         Text("DREAM11", color = D11White, fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold)
                     }
@@ -177,9 +202,7 @@ fun HomeScreen(
                         modifier = Modifier.size(36.dp).clip(CircleShape)
                             .background(D11LightGray),
                         contentAlignment = Alignment.Center
-                    ) {
-                        Text("🔔", fontSize = 16.sp)
-                    }
+                    ) { Text("ðŸ””", fontSize = 16.sp) }
                     Box(
                         modifier = Modifier.clip(RoundedCornerShape(20.dp))
                             .background(D11LightGray)
@@ -188,7 +211,7 @@ fun HomeScreen(
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Text("₹${userData.balance}", color = D11White,
+                            Text("â‚¹${userData.balance}", color = D11White,
                                 fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             Text("+", color = D11Green, fontSize = 16.sp,
                                 fontWeight = FontWeight.ExtraBold)
@@ -197,16 +220,14 @@ fun HomeScreen(
                 }
             }
 
-            // SPORT TAB - Only Cricket
+            // SPORT TAB
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .background(Color(0xFF1A1A1A))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🏏", fontSize = 20.sp)
+                    Text("ðŸ", fontSize = 20.sp)
                     Text("Cricket", color = D11Red, fontSize = 12.sp,
                         fontWeight = FontWeight.Bold)
                     Box(modifier = Modifier.width(40.dp).height(2.dp).background(D11Red))
@@ -228,86 +249,51 @@ fun HomeScreen(
                     }
                 }
 
-                errorMsg.isNotEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("😔", fontSize = 48.sp)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(errorMsg, color = D11Gray, fontSize = 14.sp)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = {
-                                    isLoading = true
-                                    errorMsg = ""
-                                    scope.launch {
-                                        try {
-                                            val response = CricbuzzApi.service.getLiveMatches()
-                                            val allMatches = mutableListOf<CricMatch>()
-                                            response.typeMatches?.forEach { typeMatch ->
-                                                typeMatch.seriesMatches?.forEach { sw ->
-                                                    sw.seriesAdWrapper?.matches?.forEach { cbMatch ->
-                                                        val info = cbMatch.matchInfo ?: return@forEach
-                                                        allMatches.add(CricMatch(
-                                                            id = info.matchId.toString(),
-                                                            name = "${info.team1?.teamSName} vs ${info.team2?.teamSName}",
-                                                            status = info.status,
-                                                            venue = "${info.venueInfo?.ground}, ${info.venueInfo?.city}",
-                                                            date = info.startDate,
-                                                            teams = listOf(
-                                                                info.team1?.teamName ?: "Team 1",
-                                                                info.team2?.teamName ?: "Team 2"
-                                                            ),
-                                                            matchStarted = info.state == "In Progress",
-                                                            matchEnded = info.state == "Complete"
-                                                        ))
-                                                    }
-                                                }
-                                            }
-                                            matches = allMatches
-                                            isLoading = false
-                                        } catch (e: Exception) {
-                                            errorMsg = "Error: ${e.message}"
-                                            isLoading = false
-                                        }
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = D11Red),
-                                shape = RoundedCornerShape(8.dp)
-                            ) { Text("🔄 Dobara Try Karo") }
-                        }
-                    }
-                }
-
                 else -> {
+                    val filteredMatches = when (selectedLeague) {
+                        "IPL" -> matches.filter {
+                            it.name.contains("IPL", true) ||
+                                    it.teams.any { t -> listOf("MI", "CSK", "RCB", "KKR", "DC",
+                                        "PBKS", "RR", "SRH", "GT", "LSG",
+                                        "Mumbai", "Chennai", "Royal", "Kolkata",
+                                        "Delhi", "Punjab", "Rajasthan", "Sunrisers",
+                                        "Gujarat", "Lucknow").any { team ->
+                                        t.contains(team, true) }
+                                    }
+                        }
+                        "WPL" -> matches.filter { it.name.contains("WPL", true) ||
+                                it.status.contains("WPL", true) }
+                        "T20I" -> matches.filter { it.status.contains("T20I", true) }
+                        "ODI" -> matches.filter { it.status.contains("ODI", true) }
+                        else -> matches
+                    }
+
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
                         // MY MATCHES
-                        if (matches.isNotEmpty()) {
-                            item {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("My Matches", color = D11White,
-                                        fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                    Text("View All >", color = D11Red,
-                                        fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                }
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("My Matches", color = D11White,
+                                    fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text("View All >", color = D11Red,
+                                    fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
-                            item {
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(matches.take(3)) { match ->
-                                        MyMatchCard(match = match,
-                                            onClick = { onMatchClick(matchDataFromCric(match)) })
-                                    }
+                        }
+                        item {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(matches.take(3)) { match ->
+                                    MyMatchCard(match = match,
+                                        onClick = { onMatchClick(matchDataFromCric(match)) })
                                 }
                             }
                         }
@@ -359,12 +345,12 @@ fun HomeScreen(
                         }
 
                         // MATCHES
-                        if (matches.isEmpty()) {
+                        if (filteredMatches.isEmpty()) {
                             item {
                                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp),
                                     contentAlignment = Alignment.Center) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("🏏", fontSize = 48.sp)
+                                        Text("ðŸ", fontSize = 48.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text("Abhi koi match nahi hai",
                                             color = D11Gray, fontSize = 14.sp)
@@ -372,7 +358,7 @@ fun HomeScreen(
                                 }
                             }
                         } else {
-                            items(matches) { match ->
+                            items(filteredMatches) { match ->
                                 Dream11MatchCard(
                                     match = match,
                                     onClick = { onMatchClick(matchDataFromCric(match)) }
@@ -390,7 +376,7 @@ fun HomeScreen(
                                         containerColor = Color(0xFF333333)),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("⚙️ Admin Panel", color = D11White)
+                                    Text("âš™ï¸ Admin Panel", color = D11White)
                                 }
                             }
                         }
@@ -408,10 +394,10 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             listOf(
-                "home" to "🏠" to "Home",
-                "matches" to "🏏" to "My Matches",
-                "rewards" to "🎁" to "Rewards",
-                "refer" to "👥" to "Refer & Win"
+                "home" to "ðŸ " to "Home",
+                "matches" to "ðŸ" to "My Matches",
+                "rewards" to "ðŸŽ" to "Rewards",
+                "refer" to "ðŸ‘¥" to "Refer & Win"
             ).forEach { (tabIcon, label) ->
                 val (tab, icon) = tabIcon
                 Column(
@@ -429,8 +415,7 @@ fun HomeScreen(
                     )
                     if (currentTab == tab) {
                         Spacer(modifier = Modifier.height(2.dp))
-                        Box(modifier = Modifier.width(20.dp).height(2.dp)
-                            .background(D11Red))
+                        Box(modifier = Modifier.width(20.dp).height(2.dp).background(D11Red))
                     }
                 }
             }
@@ -450,11 +435,11 @@ fun matchDataFromCric(match: CricMatch): MatchData {
         team1Logo = match.teamInfo?.getOrNull(0)?.img ?: "",
         team2Logo = match.teamInfo?.getOrNull(1)?.img ?: "",
         type = "T20",
-        league = "IPL 2025",
+        league = "IPL 2026",
         matchTime = match.date,
         hoursLeft = 2,
         minutesLeft = 30,
-        prize = "₹50 Crores",
+        prize = "â‚¹50 Crores",
         spots = "50,000",
         fillPercent = 75,
         badge = "MEGA",
@@ -468,49 +453,73 @@ fun MyMatchCard(match: CricMatch, onClick: () -> Unit) {
     val teams = match.name.split(" vs ", ignoreCase = true)
     val team1 = teams.getOrElse(0) { match.teams.getOrElse(0) { "T1" } }.trim()
     val team2 = teams.getOrElse(1) { match.teams.getOrElse(1) { "T2" } }.trim()
+    val isLive = match.matchStarted && !match.matchEnded
     val isCompleted = match.matchEnded
 
     Card(
-        modifier = Modifier.width(220.dp).clickable { onClick() },
+        modifier = Modifier.width(200.dp).clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = D11CardBg),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(24.dp).clip(CircleShape)
-                        .background(Color(0xFF003366)),
-                        contentAlignment = Alignment.Center) {
-                        Text(team1.take(2).uppercase(), color = D11White,
-                            fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Text(team1.take(8), color = D11White, fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("IPL 2026", color = D11Gray, fontSize = 10.sp)
+                Box(
+                    modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                        .background(
+                            when {
+                                isLive -> Color(0xFF8B0000)
+                                isCompleted -> D11LightGray
+                                else -> Color(0xFF003300)
+                            }
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        when {
+                            isLive -> "LIVE"
+                            isCompleted -> "Done"
+                            else -> "Upcoming"
+                        },
+                        color = when {
+                            isLive -> Color(0xFFFF4444)
+                            isCompleted -> D11Gray
+                            else -> D11Green
+                        },
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold
+                    )
                 }
-                Text(
-                    if (isCompleted) "Completed" else "Live",
-                    color = if (isCompleted) D11Gray else D11Green,
-                    fontSize = 11.sp, fontWeight = FontWeight.Bold
-                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(28.dp).clip(CircleShape)
+                    .background(Color(0xFF003366)),
+                    contentAlignment = Alignment.Center) {
+                    Text(team1.take(2).uppercase(), color = D11White,
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+                Text(team1.take(10), color = D11White, fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(24.dp).clip(CircleShape)
+                Box(modifier = Modifier.size(28.dp).clip(CircleShape)
                     .background(Color(0xFF006600)),
                     contentAlignment = Alignment.Center) {
                     Text(team2.take(2).uppercase(), color = D11White,
-                        fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
-                Text(team2.take(8), color = D11White, fontSize = 12.sp,
+                Text(team2.take(10), color = D11White, fontSize = 12.sp,
                     fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(color = D11Border, thickness = 0.5.dp)
             Spacer(modifier = Modifier.height(6.dp))
-            Text("Today", color = D11Gray, fontSize = 11.sp)
+            Text(match.status.take(30), color = D11Gray, fontSize = 10.sp)
         }
     }
 }
@@ -531,7 +540,6 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
         shape = RoundedCornerShape(12.dp)
     ) {
         Column {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .background(Color(0xFFF5F5F5))
@@ -539,24 +547,23 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("T20 • IPL 2025", color = Color(0xFF333333),
+                Text("T20 â€¢ IPL 2026", color = Color(0xFF333333),
                     fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                if (isLive) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    isLive -> Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Box(modifier = Modifier.size(6.dp).clip(CircleShape)
                             .background(D11Red))
                         Text("LIVE", color = D11Red, fontSize = 11.sp,
                             fontWeight = FontWeight.Bold)
                     }
-                } else if (!isCompleted) {
-                    CountdownTimer(hoursLeft = 2, minutesLeft = 30)
-                } else {
-                    Text("Completed", color = D11Gray, fontSize = 11.sp)
+                    isCompleted -> Text("Completed", color = D11Gray, fontSize = 11.sp)
+                    else -> CountdownTimer(hoursLeft = 2, minutesLeft = 30)
                 }
             }
 
-            // Teams
             Row(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -564,57 +571,61 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(modifier = Modifier.size(40.dp).clip(CircleShape)
+                    Box(modifier = Modifier.size(44.dp).clip(CircleShape)
                         .background(Color(0xFF003366)),
                         contentAlignment = Alignment.Center) {
                         Text(team1.take(3).uppercase(), color = D11White,
-                            fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                            fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
                     Column {
                         Text(team1.take(3).uppercase(), color = Color(0xFF111111),
-                            fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                            fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
                         Text(team1.take(15), color = Color(0xFF666666), fontSize = 11.sp)
+                        val score1 = match.score?.getOrNull(0)
+                        if (score1 != null && isLive) {
+                            Text("${score1.r}/${score1.w} (${score1.o})",
+                                color = Color(0xFF111111), fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    val score1 = match.score?.getOrNull(0)
-                    val score2 = match.score?.getOrNull(1)
-                    if (score1 != null) {
-                        Text("${score1.r}/${score1.w}",
-                            color = Color(0xFF111111), fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                    } else {
-                        Text(match.date.take(10), color = Color(0xFF333333),
-                            fontSize = 10.sp, textAlign = TextAlign.Center)
-                    }
-                    Text("vs", color = Color(0xFF888888), fontSize = 12.sp)
-                    if (score2 != null) {
-                        Text("${score2.r}/${score2.w}",
-                            color = Color(0xFF111111), fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                    }
-                }
+                Text("vs", color = Color(0xFF888888), fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
 
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(team2.take(3).uppercase(), color = Color(0xFF111111),
-                            fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                            fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
                         Text(team2.take(15), color = Color(0xFF666666), fontSize = 11.sp)
+                        val score2 = match.score?.getOrNull(1)
+                        if (score2 != null && isLive) {
+                            Text("${score2.r}/${score2.w} (${score2.o})",
+                                color = Color(0xFF111111), fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold)
+                        }
                     }
-                    Box(modifier = Modifier.size(40.dp).clip(CircleShape)
+                    Box(modifier = Modifier.size(44.dp).clip(CircleShape)
                         .background(Color(0xFF006600)),
                         contentAlignment = Alignment.Center) {
                         Text(team2.take(3).uppercase(), color = D11White,
-                            fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                            fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
             }
 
+            if (match.status.isNotEmpty()) {
+                Text(
+                    match.status,
+                    color = if (isLive) D11Red else Color(0xFF666666),
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                )
+            }
+
             HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 0.5.dp)
 
-            // Prize + Play
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -629,10 +640,9 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                         Text("M", color = D11Black, fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold)
                     }
-                    Text("₹50 Crores +", color = Color(0xFF111111),
+                    Text("â‚¹50 Crores +", color = Color(0xFF111111),
                         fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
                 }
-                // Sirf upcoming/live matches mein Play button
                 if (!isCompleted) {
                     Button(
                         onClick = onClick,
@@ -644,7 +654,6 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                             fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                     }
                 } else {
-                    // Completed match - View button
                     OutlinedButton(
                         onClick = onClick,
                         border = androidx.compose.foundation.BorderStroke(1.dp, D11Gray),
@@ -656,7 +665,6 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                 }
             }
 
-            // Progress bar
             Box(modifier = Modifier.fillMaxWidth().height(3.dp)
                 .background(Color(0xFFEEEEEE))) {
                 Box(modifier = Modifier.fillMaxWidth(0.75f).height(3.dp)
