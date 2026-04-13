@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="680"
+    android:viewportHeight="500">
+
+    <!-- Trophy body -->
+    <path
+        android:pathData="M340,60 L430,60 L430,200 Q430,240 400,265 Q385,275 370,283 L355,295 L340,310 L325,295 L310,283 Q295,275 280,265 Q250,240 250,200 L250,60 Z"
+        android:fillColor="#D4002A"/>
+
+    <!-- Left handle -->
+    <path
+        android:pathData="M250,80 Q200,80 200,130 Q200,170 250,175"
+        android:fillColor="#00000000"
+        android:strokeColor="#D4002A"
+        android:strokeWidth="28"
+        android:strokeLineCap="round"/>
+
+    <!-- Right handle -->
+    <path
+        android:pathData="M430,80 Q480,80 480,130 Q480,170 430,175"
+        android:fillColor="#00000000"
+        android:strokeColor="#D4002A"
+        android:strokeWidth="28"
+        android:strokeLineCap="round"/>
+
+    <!-- Stem -->
+    <path
+        android:pathData="M318,305 L362,305 L362,345 L318,345 Z"
+        android:fillColor="#D4002A"/>
+
+    <!-- Base -->
+    <path
+        android:pathData="M285,342 Q285,364 291,364 L389,364 Q395,364 395,342 Z"
+        android:fillColor="#D4002A"/>
+
+    <!-- D letter -->
+    <path
+        android:pathData="M290,130 L290,270 L340,270 Q400,270 400,200 Q400,130 340,130 Z M320,160 L340,160 Q368,160 368,200 Q368,240 340,240 L320,240 Z"
+        android:fillColor="#FFFFFF"/>
+
+</vector>
