@@ -27,8 +27,10 @@ const val ADMIN_UID = "1irz1sRJ3QNeEtUuN70OSWiUBdq2"
 data class PaymentRequest(
     val id: String = "",
     val userId: String = "",
+    val userName: String = "",
     val userPhone: String = "",
     val amount: Int = 0,
+    val utrNumber: String = "",
     val status: String = "pending",
     val timestamp: Long = 0L
 )
@@ -668,3 +670,4 @@ fun AdminTextField(
         singleLine = true
     )
 }
+

@@ -20,6 +20,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 
 @Composable
 fun HomeScreen(
@@ -36,6 +40,45 @@ fun HomeScreen(
     var matches by remember { mutableStateOf<List<CricMatch>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf("") }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    // Refresh function
+    fun refresh() {
+        isRefreshing = true
+        scope.launch {
+            try {
+                val allMatches = mutableListOf<CricMatch>()
+                try {
+                    val liveResp = CricbuzzApi.service.getLiveMatches()
+                    liveResp.typeMatches?.forEach { typeMatch ->
+                        typeMatch.seriesMatches?.forEach { sw ->
+                            sw.seriesAdWrapper?.matches?.forEach { cbMatch ->
+                                val info = cbMatch.matchInfo ?: return@forEach
+                                allMatches.add(CricMatch(
+                                    id = info.matchId.toString(),
+                                    name = "${info.team1?.teamSName} vs ${info.team2?.teamSName}",
+                                    status = info.status,
+                                    venue = "${info.venueInfo?.ground}, ${info.venueInfo?.city}",
+                                    date = info.startDate,
+                                    teams = listOf(info.team1?.teamName ?: "T1", info.team2?.teamName ?: "T2"),
+                                    matchStarted = info.state == "In Progress",
+                                    matchEnded = info.state == "Complete"
+                                ))
+                            }
+                        }
+                    }
+                } catch (e: Exception) { }
+                if (allMatches.isEmpty()) {
+                    matches = emptyList()
+                } else {
+                    matches = allMatches
+                }
+            } catch (e: Exception) {
+                matches = emptyList()
+            }
+            isRefreshing = false
+        }
+    }
     var selectedLeague by remember { mutableStateOf("All") }
 
     val sampleMatches = listOf(
@@ -154,7 +197,7 @@ fun HomeScreen(
                 matches = allMatches
                 isLoading = false
             } catch (e: Exception) {
-                matches = sampleMatches
+                matches = emptyList()
                 isLoading = false
             }
         }
@@ -681,3 +724,7 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
         }
     }
 }
+
+
+
+
