@@ -31,11 +31,11 @@ data class TeamInfo(val name: String = "", val shortname: String = "", val img: 
 data class Score(val r: Int = 0, val w: Int = 0, val o: Double = 0.0, val inning: String = "")
 
 interface CricbuzzApiService {
-    @GET("matches/live")
+    @GET("matches/v1/live")
     suspend fun getLiveMatches(@Header("x-rapidapi-key") apiKey: String = RAPID_API_KEY, @Header("x-rapidapi-host") host: String = RAPID_API_HOST): CricbuzzMatchListResponse
-    @GET("matches/upcoming")
+    @GET("matches/v1/upcoming")
     suspend fun getUpcomingMatches(@Header("x-rapidapi-key") apiKey: String = RAPID_API_KEY, @Header("x-rapidapi-host") host: String = RAPID_API_HOST): CricbuzzMatchListResponse
-    @GET("matches/recent")
+    @GET("matches/v1/recent")
     suspend fun getRecentMatches(@Header("x-rapidapi-key") apiKey: String = RAPID_API_KEY, @Header("x-rapidapi-host") host: String = RAPID_API_HOST): CricbuzzMatchListResponse
 }
 
@@ -59,3 +59,4 @@ object CricbuzzApi {
         Retrofit.Builder().baseUrl(CRICBUZZ_BASE_URL).addConverterFactory(GsonConverterFactory.create()).build().create(CricbuzzApiService::class.java)
     }
 }
+

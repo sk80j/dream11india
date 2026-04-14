@@ -1,5 +1,6 @@
 package com.example.dream11india
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -47,99 +49,154 @@ fun TeamPreviewScreen(
     val batPlayers = sampleTeam.filter { it.role == "BAT" }
     val arPlayers = sampleTeam.filter { it.role == "AR" }
     val bowlPlayers = sampleTeam.filter { it.role == "BOWL" }
+    val captain = sampleTeam.find { it.isCaptain }
+    val viceCaptain = sampleTeam.find { it.isViceCaptain }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A))) {
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0D0D0D))) {
 
         // TOP BAR
-        Row(modifier = Modifier.fillMaxWidth().background(D11Red)
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("←", color = D11White, fontSize = 24.sp,
-                    modifier = Modifier.clickable { onBack() })
-                Spacer(modifier = Modifier.width(12.dp))
-                Image(painter = painterResource(id = R.drawable.ic_logo),
-                    contentDescription = "Logo", modifier = Modifier.size(28.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Team Preview", color = D11White, fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.fillMaxWidth()
+            .background(Brush.verticalGradient(
+                colors = listOf(D11Red, D11DarkRed)
+            ))) {
+            Row(modifier = Modifier.fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("←", color = D11White, fontSize = 24.sp,
+                        modifier = Modifier.clickable { onBack() })
+                    Image(painter = painterResource(id = R.drawable.ic_logo),
+                        contentDescription = "Logo", modifier = Modifier.size(28.dp))
+                    Column {
+                        Text("Team Preview", color = D11White, fontSize = 16.sp,
+                            fontWeight = FontWeight.ExtraBold)
+                        Text(matchTitle, color = Color(0xFFFFCDD2), fontSize = 11.sp)
+                    }
+                }
+                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                    .background(Color(0x33FFFFFF))
+                    .clickable { onEditTeam() }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)) {
+                    Text("Edit Team", color = D11White, fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold)
+                }
             }
-            Text("Edit", color = D11White, fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable { onEditTeam() })
+        }
+
+        // C/VC Info Bar
+        Row(modifier = Modifier.fillMaxWidth()
+            .background(Color(0xFF1A1A1A))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(28.dp).clip(CircleShape)
+                    .background(D11Yellow),
+                    contentAlignment = Alignment.Center) {
+                    Text("C", color = D11Black, fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold)
+                }
+                Text(captain?.name ?: "Not selected", color = D11White,
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("2x", color = D11Yellow, fontSize = 12.sp)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(28.dp).clip(CircleShape)
+                    .background(Color(0xFFAAAAAA)),
+                    contentAlignment = Alignment.Center) {
+                    Text("VC", color = D11Black, fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold)
+                }
+                Text(viceCaptain?.name ?: "Not selected", color = D11White,
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("1.5x", color = Color(0xFFAAAAAA), fontSize = 12.sp)
+            }
         }
 
         LazyColumn(modifier = Modifier.weight(1f)) {
 
             // CRICKET FIELD
             item {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(480.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color(0xFF1B5E20), Color(0xFF2E7D32),
-                                    Color(0xFF388E3C), Color(0xFF2E7D32), Color(0xFF1B5E20))
-                            )
+                Box(modifier = Modifier.fillMaxWidth().height(500.dp)
+                    .background(Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF1B5E20),
+                            Color(0xFF2E7D32),
+                            Color(0xFF388E3C),
+                            Color(0xFF2E7D32),
+                            Color(0xFF1B5E20)
                         )
-                ) {
-                    // Field lines
+                    ))) {
+
+                    // Field markings
                     Box(modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center) {
-                        Box(modifier = Modifier.size(200.dp).clip(CircleShape)
-                            .background(Color(0x20FFFFFF)))
-                        Box(modifier = Modifier.size(120.dp).clip(CircleShape)
+                        // Outer circle
+                        Box(modifier = Modifier.size(280.dp).clip(CircleShape)
                             .background(Color(0x15FFFFFF)))
+                        // Inner circle
+                        Box(modifier = Modifier.size(160.dp).clip(CircleShape)
+                            .background(Color(0x10FFFFFF)))
+                        // Center dot
+                        Box(modifier = Modifier.size(40.dp).clip(CircleShape)
+                            .background(Color(0x20FFFFFF)))
                     }
 
-                    Column(modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Players on field
+                    Column(modifier = Modifier.fillMaxSize().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceEvenly) {
 
-                        // WK
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("WICKET-KEEPERS", color = Color(0xAAFFFFFF), fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly) {
-                            wkPlayers.forEach { player ->
-                                PlayerFieldCard(player = player)
+                        // WK Row
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("WICKET-KEEPERS", color = Color(0xCCFFFFFF),
+                                fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly) {
+                                wkPlayers.forEach { PlayerFieldCard(player = it) }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // BAT
-                        Text("BATTERS", color = Color(0xAAFFFFFF), fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly) {
-                            batPlayers.forEach { player ->
-                                PlayerFieldCard(player = player)
+                        // BAT Row
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("BATTERS", color = Color(0xCCFFFFFF),
+                                fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly) {
+                                batPlayers.forEach { PlayerFieldCard(player = it) }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // AR
-                        Text("ALL-ROUNDERS", color = Color(0xAAFFFFFF), fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly) {
-                            arPlayers.forEach { player ->
-                                PlayerFieldCard(player = player)
+                        // AR Row
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("ALL-ROUNDERS", color = Color(0xCCFFFFFF),
+                                fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly) {
+                                arPlayers.forEach { PlayerFieldCard(player = it) }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // BOWL
-                        Text("BOWLERS", color = Color(0xAAFFFFFF), fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly) {
-                            bowlPlayers.forEach { player ->
-                                PlayerFieldCard(player = player)
+                        // BOWL Row
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("BOWLERS", color = Color(0xCCFFFFFF),
+                                fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly) {
+                                bowlPlayers.forEach { PlayerFieldCard(player = it) }
                             }
                         }
                     }
@@ -150,62 +207,108 @@ fun TeamPreviewScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth().padding(16.dp),
                     colors = CardDefaults.cardColors(containerColor = D11CardBg),
-                    shape = RoundedCornerShape(12.dp)) {
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(4.dp)) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Team Summary", color = D11White, fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("Team Summary", color = D11White, fontSize = 16.sp,
+                                fontWeight = FontWeight.ExtraBold)
+                            Text("11 Players", color = D11Green, fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Role counts
                         Row(modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly) {
                             listOf(
-                                "WK" to wkPlayers.size,
-                                "BAT" to batPlayers.size,
-                                "AR" to arPlayers.size,
-                                "BOWL" to bowlPlayers.size
-                            ).forEach { (role, count) ->
+                                Triple("WK", wkPlayers.size, Color(0xFF6666FF)),
+                                Triple("BAT", batPlayers.size, D11Green),
+                                Triple("AR", arPlayers.size, D11Red),
+                                Triple("BOWL", bowlPlayers.size, D11Yellow)
+                            ).forEach { (role, count, color) ->
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("$count", color = D11Yellow, fontSize = 20.sp,
-                                        fontWeight = FontWeight.ExtraBold)
-                                    Text(role, color = D11Gray, fontSize = 12.sp)
+                                    Box(modifier = Modifier.size(44.dp).clip(CircleShape)
+                                        .background(color.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center) {
+                                        Text("$count", color = color, fontSize = 20.sp,
+                                            fontWeight = FontWeight.ExtraBold)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(role, color = D11Gray, fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Spacer(modifier = Modifier.height(16.dp))
                         HorizontalDivider(color = D11Border)
                         Spacer(modifier = Modifier.height(12.dp))
+
+                        // Team split
                         Row(modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("$team1: ${sampleTeam.count { it.team == team1 }}",
-                                color = D11White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("$team2: ${sampleTeam.count { it.team == team2 }}",
-                                color = D11White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Column(horizontalAlignment = Alignment.Start) {
+                                Text(team1, color = D11Gray, fontSize = 12.sp)
+                                Text("${sampleTeam.count { it.team == team1 }} Players",
+                                    color = D11White, fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(team2, color = D11Gray, fontSize = 12.sp)
+                                Text("${sampleTeam.count { it.team == team2 }} Players",
+                                    color = D11White, fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Total credits
+                        Row(modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1A1A1A))
+                            .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Total Credits Used", color = D11Gray, fontSize = 13.sp)
+                            Text("${sampleTeam.sumOf { it.credits.toDouble() }.toFloat()} / 100",
+                                color = D11Yellow, fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold)
                         }
                     }
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            item { Spacer(modifier = Modifier.height(100.dp)) }
         }
 
         // BOTTOM BUTTONS
-        Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF111111))
-            .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(
-                onClick = onEditTeam,
-                modifier = Modifier.weight(1f).height(52.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, D11Red),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Edit Team", color = D11Red, fontWeight = FontWeight.Bold)
-            }
-            Button(
-                onClick = onJoinContest,
-                modifier = Modifier.weight(1f).height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = D11Red),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Join Contest", color = D11White, fontWeight = FontWeight.ExtraBold)
+        Box(modifier = Modifier.fillMaxWidth()
+            .background(Color(0xFF111111))
+            .padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onEditTeam,
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    border = androidx.compose.foundation.BorderStroke(2.dp, D11White),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Edit Team", color = D11White, fontWeight = FontWeight.ExtraBold,
+                        fontSize = 15.sp)
+                }
+                Button(
+                    onClick = onJoinContest,
+                    modifier = Modifier.weight(2f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = D11Green),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = ButtonDefaults.buttonElevation(8.dp)
+                ) {
+                    Text("Join Contest →", color = D11White,
+                        fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                }
             }
         }
     }
@@ -213,43 +316,68 @@ fun TeamPreviewScreen(
 
 @Composable
 fun PlayerFieldCard(player: Player) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(70.dp)) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(72.dp)
+    ) {
         Box(contentAlignment = Alignment.TopEnd) {
-            Box(modifier = Modifier.size(52.dp).clip(CircleShape)
-                .background(
-                    when(player.role) {
-                        "WK" -> Color(0xFF1A237E)
-                        "BAT" -> Color(0xFF1B5E20)
-                        "AR" -> Color(0xFF4A148C)
-                        else -> Color(0xFF880E4F)
-                    }
-                ),
-                contentAlignment = Alignment.Center) {
+            // Player circle with shadow
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .shadow(4.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(
+                        when(player.role) {
+                            "WK" -> Brush.radialGradient(listOf(Color(0xFF3949AB), Color(0xFF1A237E)))
+                            "BAT" -> Brush.radialGradient(listOf(Color(0xFF43A047), Color(0xFF1B5E20)))
+                            "AR" -> Brush.radialGradient(listOf(Color(0xFF8E24AA), Color(0xFF4A148C)))
+                            else -> Brush.radialGradient(listOf(Color(0xFFE53935), Color(0xFF880E4F)))
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(player.shortName.take(2).uppercase(), color = D11White,
-                    fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
             }
+
+            // C/VC Badge
             if (player.isCaptain) {
-                Box(modifier = Modifier.size(18.dp).clip(CircleShape)
-                    .background(D11Yellow),
-                    contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.size(20.dp).clip(CircleShape)
+                        .background(D11Yellow)
+                        .shadow(2.dp, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("C", color = D11Black, fontSize = 10.sp,
                         fontWeight = FontWeight.ExtraBold)
                 }
             } else if (player.isViceCaptain) {
-                Box(modifier = Modifier.size(18.dp).clip(CircleShape)
-                    .background(Color(0xFFAAAAAA)),
-                    contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.size(20.dp).clip(CircleShape)
+                        .background(Color(0xFFBBBBBB))
+                        .shadow(2.dp, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("VC", color = D11Black, fontSize = 8.sp,
                         fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text(player.shortName.take(8), color = D11White, fontSize = 11.sp,
-            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
-            maxLines = 1)
-        Text("${player.credits} Cr", color = Color(0xAAFFFFFF), fontSize = 10.sp,
-            textAlign = TextAlign.Center)
+        Text(
+            player.shortName.take(8),
+            color = D11White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+        Text(
+            "${player.credits} Cr",
+            color = Color(0xAAFFFFFF),
+            fontSize = 9.sp,
+            textAlign = TextAlign.Center
+        )
     }
 }

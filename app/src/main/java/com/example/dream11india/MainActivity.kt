@@ -231,7 +231,7 @@ fun Dream11App(activity: ComponentActivity) {
             onBack = { goBack() }
         )
         "contest" -> ContestScreen(
-            matchTitle = "${currentMatch.team1} vs ${currentMatch.team2}",
+            matchTitle = "${currentMatch.team1Full.ifEmpty { currentMatch.team1 }} vs ${currentMatch.team2Full.ifEmpty { currentMatch.team2 }}",
             userData = userData,
             onBack = { goBack() },
             onJoin = { navigateTo("team_create") }
