@@ -1,17 +1,15 @@
 ﻿package com.example.dream11india
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
 
 // ===== POINTS RULES =====
 object PointsCalculator {
 
     fun calculateBattingPoints(
-        runs: Int,
-        fours: Int = 0,
-        sixes: Int = 0,
-        isOut: Boolean = true,
-        ballsFaced: Int = 0
+        runs: Int, fours: Int = 0, sixes: Int = 0,
+        isOut: Boolean = true, ballsFaced: Int = 0
     ): Float {
         var points = 0f
         points += runs * 1f
@@ -21,7 +19,6 @@ object PointsCalculator {
         else if (runs >= 50) points += 8f
         else if (runs >= 30) points += 4f
         if (runs == 0 && isOut && ballsFaced > 0) points -= 2f
-        // Strike rate bonus (if balls faced > 10)
         if (ballsFaced >= 10) {
             val sr = (runs.toFloat() / ballsFaced) * 100
             when {
@@ -36,10 +33,8 @@ object PointsCalculator {
     }
 
     fun calculateBowlingPoints(
-        wickets: Int,
-        runsConceded: Int = 0,
-        oversBowled: Float = 0f,
-        maidens: Int = 0
+        wickets: Int, runsConceded: Int = 0,
+        oversBowled: Float = 0f, maidens: Int = 0
     ): Float {
         var points = 0f
         points += wickets * 25f
@@ -47,7 +42,6 @@ object PointsCalculator {
         else if (wickets >= 4) points += 12f
         else if (wickets >= 3) points += 8f
         points += maidens * 4f
-        // Economy rate bonus (if overs >= 2)
         if (oversBowled >= 2f) {
             val economy = runsConceded.toFloat() / oversBowled
             when {
@@ -62,9 +56,7 @@ object PointsCalculator {
     }
 
     fun calculateFieldingPoints(
-        catches: Int = 0,
-        stumpings: Int = 0,
-        runOuts: Int = 0
+        catches: Int = 0, stumpings: Int = 0, runOuts: Int = 0
     ): Float {
         var points = 0f
         points += catches * 8f
@@ -93,11 +85,10 @@ object PointsCalculator {
     ): Float {
         var total = 0f
         players.forEach { p ->
-            val pts = p.totalPoints
-            total += when (p.playerId) {
-                captainId -> pts * 2f
-                viceCaptainId -> pts * 1.5f
-                else -> pts
+            total += when(p.playerId) {
+                captainId -> p.totalPoints * 2f
+                viceCaptainId -> p.totalPoints * 1.5f
+                else -> p.totalPoints
             }
         }
         return total
@@ -125,122 +116,186 @@ data class PlayerPoints(
     val totalPoints: Float = 0f
 )
 
-data class TeamResult(
-    val teamId: String = "",
-    val userId: String = "",
-    val userName: String = "",
-    val totalPoints: Float = 0f,
-    val rank: Int = 0,
-    val captainId: String = "",
-    val viceCaptainId: String = ""
-)
-
-// ===== FIRESTORE POINTS MANAGER =====
-object PointsManager {
+// ===== SAFE PRIZE DISTRIBUTOR =====
+object PrizeDistributor {
     private val db = FirebaseFirestore.getInstance()
 
-    // Save player stats to Firestore
-    suspend fun savePlayerStats(matchId: String, stats: List<PlayerPoints>) {
-        val batch = db.batch()
-        stats.forEach { player ->
-            val points = PointsCalculator.calculateTotalPoints(
-                runs = player.runs, fours = player.fours, sixes = player.sixes,
-                isOut = player.isOut, ballsFaced = player.ballsFaced,
-                wickets = player.wickets, runsConceded = player.runsConceded,
-                oversBowled = player.oversBowled, maidens = player.maidens,
-                catches = player.catches, stumpings = player.stumpings,
-                runOuts = player.runOuts
-            )
-            val updatedPlayer = player.copy(totalPoints = points)
-            val ref = db.collection("matchStats")
-                .document(matchId)
-                .collection("players")
-                .document(player.playerId)
-            batch.set(ref, mapOf(
-                "playerId" to updatedPlayer.playerId,
-                "playerName" to updatedPlayer.playerName,
-                "team" to updatedPlayer.team,
-                "role" to updatedPlayer.role,
-                "runs" to updatedPlayer.runs,
-                "fours" to updatedPlayer.fours,
-                "sixes" to updatedPlayer.sixes,
-                "wickets" to updatedPlayer.wickets,
-                "catches" to updatedPlayer.catches,
-                "stumpings" to updatedPlayer.stumpings,
-                "runOuts" to updatedPlayer.runOuts,
-                "totalPoints" to updatedPlayer.totalPoints
+    // STEP 1: Check guards
+    // STEP 2: Fetch entries sorted
+    // STEP 3: Rank + prize batch
+    // STEP 4: Wallet transaction (separate loop)
+    // STEP 5: Mark distributed
+    fun distributeContestPrizes(contestId: String) {
+        val contestRef = db.collection("contests").document(contestId)
+
+        // GUARD: check match ended + not already distributed
+        contestRef.get().addOnSuccessListener { contestDoc ->
+            if (!contestDoc.exists()) return@addOnSuccessListener
+
+            val isDistributed = contestDoc.getBoolean("isDistributed") ?: false
+            val isMatchEnded = contestDoc.getBoolean("isMatchEnded") ?: false
+
+            if (isDistributed) return@addOnSuccessListener
+            if (!isMatchEnded) return@addOnSuccessListener
+
+            // Parse prize breakup safely
+            val rawBreakup = contestDoc.get("prizeBreakup")
+            val prizeBreakup: List<Map<String, Any>> = try {
+                @Suppress("UNCHECKED_CAST")
+                rawBreakup as? List<Map<String, Any>> ?: emptyList()
+            } catch (e: Exception) { emptyList() }
+
+            // Fetch entries sorted by points
+            db.collection("contest_entries")
+                .whereEqualTo("contestId", contestId)
+                .orderBy("points", Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener { snap ->
+                    if (snap.isEmpty) return@addOnSuccessListener
+
+                    val docs = snap.documents
+
+                    // Handle ties — same points = same rank
+                    val rankMap = mutableMapOf<String, Int>()
+                    var currentRank = 1
+                    var prevPoints = -1.0
+
+                    docs.forEachIndexed { index, doc ->
+                        val pts = doc.getDouble("points") ?: 0.0
+                        if (pts != prevPoints) {
+                            currentRank = index + 1
+                            prevPoints = pts
+                        }
+                        rankMap[doc.id] = currentRank
+                    }
+
+                    // Calculate prize per doc
+                    val prizeMap = mutableMapOf<String, Long>()
+                    rankMap.forEach { (docId, rank) ->
+                        val prize = prizeBreakup.find { p ->
+                            val from = (p["rankFrom"] as? Long)?.toInt() ?: 0
+                            val to = (p["rankTo"] as? Long)?.toInt() ?: 0
+                            rank in from..to
+                        }
+                        prizeMap[docId] = (prize?.get("amount") as? Long) ?: 0L
+                    }
+
+                    // STEP 3: Batch update ranks + prizes in contest_entries
+                    val batch = db.batch()
+                    docs.forEach { doc ->
+                        val rank = rankMap[doc.id] ?: 0
+                        val prize = prizeMap[doc.id] ?: 0L
+                        batch.update(doc.reference, mapOf(
+                            "rank" to rank,
+                            "winningAmount" to prize
+                        ))
+                    }
+                    // Mark contest as distributed
+                    batch.update(contestRef, mapOf(
+                        "isDistributed" to true,
+                        "distributedAt" to System.currentTimeMillis()
+                    ))
+
+                    batch.commit().addOnSuccessListener {
+                        // STEP 4: Wallet credit — separate safe transactions
+                        docs.forEach { doc ->
+                            val prize = prizeMap[doc.id] ?: 0L
+                            val userId = doc.getString("userId") ?: ""
+                            if (prize > 0 && userId.isNotEmpty()) {
+                                creditWalletSafe(userId, prize, "Won prize - Rank #${rankMap[doc.id]}")
+                            }
+                        }
+                    }.addOnFailureListener { e ->
+                        android.util.Log.e("PrizeDistributor", "Batch failed: ${e.message}")
+                    }
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("PrizeDistributor", "Fetch failed: ${e.message}")
+                }
+        }
+    }
+
+    // SAFE wallet credit using transaction
+    private fun creditWalletSafe(userId: String, amount: Long, description: String) {
+        val userRef = db.collection("users").document(userId)
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(userRef)
+            if (!snapshot.exists()) return@runTransaction
+            val currentBalance = snapshot.getLong("balance") ?: 0L
+            val currentWinnings = snapshot.getLong("winnings") ?: 0L
+            transaction.update(userRef, mapOf(
+                "balance" to currentBalance + amount,
+                "winnings" to currentWinnings + amount
             ))
-        }
-        batch.commit().await()
-    }
-
-    // Get player points from Firestore
-    suspend fun getPlayerPoints(matchId: String): List<PlayerPoints> {
-        val snap = db.collection("matchStats")
-            .document(matchId)
-            .collection("players")
-            .get().await()
-        return snap.documents.map { doc ->
-            PlayerPoints(
-                playerId = doc.getString("playerId") ?: "",
-                playerName = doc.getString("playerName") ?: "",
-                team = doc.getString("team") ?: "",
-                role = doc.getString("role") ?: "",
-                runs = doc.getLong("runs")?.toInt() ?: 0,
-                fours = doc.getLong("fours")?.toInt() ?: 0,
-                sixes = doc.getLong("sixes")?.toInt() ?: 0,
-                wickets = doc.getLong("wickets")?.toInt() ?: 0,
-                catches = doc.getLong("catches")?.toInt() ?: 0,
-                totalPoints = doc.getDouble("totalPoints")?.toFloat() ?: 0f
-            )
+        }.addOnSuccessListener {
+            // Log transaction record
+            db.collection("transactions").add(mapOf(
+                "userId" to userId,
+                "type" to "credit",
+                "amount" to amount,
+                "description" to description,
+                "timestamp" to System.currentTimeMillis(),
+                "status" to "completed"
+            ))
+        }.addOnFailureListener { e ->
+            android.util.Log.e("PrizeDistributor", "Wallet credit failed for $userId: ${e.message}")
         }
     }
 
-    // Update team points
-    suspend fun updateTeamPoints(matchId: String, contestId: String) {
-        val playerStats = getPlayerPoints(matchId)
-        val playerPointsMap = playerStats.associateBy { it.playerId }
+    // Update team points + contest entries
+    fun updateContestPoints(matchId: String, playerStats: List<PlayerPoints>) {
+        val pointsMap = playerStats.associateBy { it.playerId }
 
-        val joinedSnap = db.collection("joined_contests")
+        // Get all teams for this match
+        db.collection("teams")
             .whereEqualTo("matchId", matchId)
-            .whereEqualTo("contestId", contestId)
-            .get().await()
+            .get()
+            .addOnSuccessListener { teamsSnap ->
+                teamsSnap.documents.forEach { teamDoc ->
+                    val playerIds = try {
+                        @Suppress("UNCHECKED_CAST")
+                        teamDoc.get("players") as? List<String> ?: emptyList()
+                    } catch (e: Exception) { emptyList() }
 
-        val batch = db.batch()
-        joinedSnap.documents.forEach { doc ->
-            val captainId = doc.getString("captainId") ?: ""
-            val viceCaptainId = doc.getString("viceCaptainId") ?: ""
-            val playerIds = (doc.get("playerIds") as? List<String>) ?: emptyList()
+                    val captainId = teamDoc.getString("captainId") ?: ""
+                    val vcId = teamDoc.getString("viceCaptainId") ?: ""
+                    val teamPlayers = playerIds.mapNotNull { pointsMap[it] }
+                    val totalPts = PointsCalculator.calculateTeamPoints(
+                        teamPlayers, captainId, vcId)
 
-            val teamPlayers = playerIds.mapNotNull { playerPointsMap[it] }
-            val totalPoints = PointsCalculator.calculateTeamPoints(
-                teamPlayers, captainId, viceCaptainId)
+                    // Update team points
+                    teamDoc.reference.update("totalPoints", totalPts)
+                        .addOnFailureListener { e ->
+                            android.util.Log.e("Points", "Team update failed: ${e.message}")
+                        }
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("Points", "Teams fetch failed: ${e.message}")
+            }
 
-            batch.update(doc.reference, "points", totalPoints)
-        }
-        batch.commit().await()
-
-        // Update rankings
-        updateRankings(contestId)
+        // Update contest entries by matchId (more efficient)
+        db.collection("contest_entries")
+            .whereEqualTo("matchId", matchId)
+            .get()
+            .addOnSuccessListener { entriesSnap ->
+                entriesSnap.documents.forEach { entryDoc ->
+                    val teamId = entryDoc.getString("teamId") ?: ""
+                    // Get team points
+                    db.collection("teams").document(teamId)
+                        .get()
+                        .addOnSuccessListener { teamDoc ->
+                            val pts = teamDoc.getDouble("totalPoints") ?: 0.0
+                            entryDoc.reference.update("points", pts)
+                                .addOnFailureListener { e ->
+                                    android.util.Log.e("Points", "Entry update failed: ${e.message}")
+                                }
+                        }
+                }
+            }
     }
 
-    // Update rankings
-    private suspend fun updateRankings(contestId: String) {
-        val snap = db.collection("joined_contests")
-            .whereEqualTo("contestId", contestId)
-            .get().await()
-
-        val sorted = snap.documents
-            .sortedByDescending { it.getDouble("points") ?: 0.0 }
-
-        val batch = db.batch()
-        sorted.forEachIndexed { index, doc ->
-            batch.update(doc.reference, "rank", index + 1)
-        }
-        batch.commit().await()
-    }
-
-    // Get sample points for testing
+    // Sample player points for testing
     fun getSamplePlayerPoints(matchId: String): List<PlayerPoints> {
         return listOf(
             PlayerPoints("4","Virat Kohli","RCB","BAT",runs=72,fours=7,sixes=2,
@@ -285,5 +340,66 @@ object PointsManager {
                 totalPoints=PointsCalculator.calculateTotalPoints(
                     wickets=2,runsConceded=24,oversBowled=4f))
         )
+    }
+}
+
+// ===== POINTS MANAGER (Firestore) =====
+object PointsManager {
+    private val db = FirebaseFirestore.getInstance()
+
+    suspend fun savePlayerStats(matchId: String, stats: List<PlayerPoints>) {
+        val batch = db.batch()
+        stats.forEach { player ->
+            val points = PointsCalculator.calculateTotalPoints(
+                runs = player.runs, fours = player.fours, sixes = player.sixes,
+                isOut = player.isOut, ballsFaced = player.ballsFaced,
+                wickets = player.wickets, runsConceded = player.runsConceded,
+                oversBowled = player.oversBowled, maidens = player.maidens,
+                catches = player.catches, stumpings = player.stumpings,
+                runOuts = player.runOuts
+            )
+            val ref = db.collection("matchStats")
+                .document(matchId)
+                .collection("players")
+                .document(player.playerId)
+            batch.set(ref, mapOf(
+                "playerId" to player.playerId,
+                "playerName" to player.playerName,
+                "team" to player.team,
+                "role" to player.role,
+                "runs" to player.runs,
+                "fours" to player.fours,
+                "sixes" to player.sixes,
+                "wickets" to player.wickets,
+                "catches" to player.catches,
+                "stumpings" to player.stumpings,
+                "runOuts" to player.runOuts,
+                "totalPoints" to points
+            ))
+        }
+        batch.commit().await()
+    }
+
+    suspend fun getPlayerPoints(matchId: String): List<PlayerPoints> {
+        val snap = db.collection("matchStats")
+            .document(matchId).collection("players").get().await()
+        return snap.documents.map { doc ->
+            PlayerPoints(
+                playerId = doc.getString("playerId") ?: "",
+                playerName = doc.getString("playerName") ?: "",
+                team = doc.getString("team") ?: "",
+                role = doc.getString("role") ?: "",
+                runs = doc.getLong("runs")?.toInt() ?: 0,
+                fours = doc.getLong("fours")?.toInt() ?: 0,
+                sixes = doc.getLong("sixes")?.toInt() ?: 0,
+                wickets = doc.getLong("wickets")?.toInt() ?: 0,
+                catches = doc.getLong("catches")?.toInt() ?: 0,
+                totalPoints = doc.getDouble("totalPoints")?.toFloat() ?: 0f
+            )
+        }
+    }
+
+    fun getSamplePlayerPoints(matchId: String): List<PlayerPoints> {
+        return PrizeDistributor.getSamplePlayerPoints(matchId)
     }
 }
