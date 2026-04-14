@@ -6,6 +6,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,19 +25,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.*
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 // ===== COLORS =====
@@ -103,15 +105,15 @@ val sampleMatches = listOf(
         "Rs.55 Crores", "1,20,000", 95, "MEGA",
         Color(0xFF003580), Color(0xFF006400)),
     MatchData("2", "MI", "CSK", "Mumbai Indians", "Chennai Super Kings", "", "",
-        "T20", "IPL 2025", "Today, 7:30 PM", 3, 15,
+        "T20", "IPL 2026", "Today, 7:30 PM", 3, 15,
         "Rs.25 Crores", "85,000", 78, "HOT",
         Color(0xFF004BA0), Color(0xFFFFD700)),
     MatchData("3", "RCB", "KKR", "Royal Challengers", "Kolkata Knight Riders", "", "",
-        "T20", "IPL 2025", "Tomorrow, 7:30 PM", 20, 0,
+        "T20", "IPL 2026", "Tomorrow, 7:30 PM", 20, 0,
         "Rs.10 Crores", "45,000", 45, "",
         Color(0xFFCC0000), Color(0xFF3A015C)),
     MatchData("4", "DC", "SRH", "Delhi Capitals", "Sunrisers Hyderabad", "", "",
-        "T20", "IPL 2025", "Tomorrow, 3:30 PM", 16, 30,
+        "T20", "IPL 2026", "Tomorrow, 3:30 PM", 16, 30,
         "Rs.5 Crores", "25,000", 20, "FREE",
         Color(0xFF0078D4), Color(0xFFFF6600)),
 )
@@ -125,13 +127,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun Dream11App(activity: ComponentActivity) {
-    val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    val firebaseUser = FirebaseAuth.getInstance().currentUser
     var screen by remember { mutableStateOf(if (firebaseUser != null) "main" else "splash") }
     var phone by remember { mutableStateOf("") }
     var vid by remember { mutableStateOf("") }
     var tab by remember { mutableStateOf("home") }
     var currentMatch by remember { mutableStateOf(sampleMatches[0]) }
-    var currentCricMatch by remember { mutableStateOf<CricMatch?>(null) }
     var userData by remember { mutableStateOf(UserData()) }
     val backStack = remember { mutableStateListOf<String>() }
 
@@ -163,16 +164,14 @@ fun Dream11App(activity: ComponentActivity) {
     }
 
     fun goBack() {
-        if (backStack.isNotEmpty()) {
-            screen = backStack.removeLast()
-        }
+        if (backStack.isNotEmpty()) screen = backStack.removeLast()
     }
 
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     DisposableEffect(backStack.size) {
         val callback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (backStack.isNotEmpty()) { goBack() }
+                if (backStack.isNotEmpty()) goBack()
             }
         }
         backDispatcher?.addCallback(callback)
@@ -215,7 +214,11 @@ fun Dream11App(activity: ComponentActivity) {
             onTabChange = { tab = it },
             onMatchClick = { match ->
                 currentMatch = match
-                navigateTo("live_score")
+                if (match.hoursLeft > 0 || match.minutesLeft > 0) {
+                    navigateTo("contest")
+                } else {
+                    navigateTo("live_score")
+                }
             },
             onWalletClick = { navigateTo("wallet") },
             onProfileClick = { navigateTo("profile") },
@@ -229,6 +232,7 @@ fun Dream11App(activity: ComponentActivity) {
         )
         "contest" -> ContestScreen(
             matchTitle = "${currentMatch.team1} vs ${currentMatch.team2}",
+            userData = userData,
             onBack = { goBack() },
             onJoin = { navigateTo("team_create") }
         )
@@ -247,6 +251,11 @@ fun Dream11App(activity: ComponentActivity) {
         )
         "wallet" -> WalletScreen(
             userData = userData,
+            onBack = { goBack() },
+            onAddMoney = { navigateTo("payment") }
+        )
+        "payment" -> PaymentScreen(
+            userData = userData,
             onBack = { goBack() }
         )
         "profile" -> ProfileScreen(
@@ -255,6 +264,7 @@ fun Dream11App(activity: ComponentActivity) {
             onLogout = { screen = "language"; backStack.clear() }
         )
         "admin" -> AdminPanelScreen(onBack = { goBack() })
+        "admin_payment" -> AdminPaymentPanel(onBack = { goBack() })
         "leaderboard" -> LeaderboardScreen(
             matchTitle = "${currentMatch.team1} vs ${currentMatch.team2}",
             onBack = { goBack() }
@@ -265,56 +275,65 @@ fun Dream11App(activity: ComponentActivity) {
 // ===== SPLASH SCREEN =====
 @Composable
 fun SplashScreen(onFinish: () -> Unit) {
-    val scale = remember { Animatable(0f) }
-    val alpha = remember { Animatable(0f) }
+    val logoScale = remember { Animatable(0f) }
+    val logoAlpha = remember { Animatable(0f) }
+    val textOffsetY = remember { Animatable(150f) }
     val textAlpha = remember { Animatable(0f) }
+    val bgAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        scale.animateTo(1f, animationSpec = spring(
+        bgAlpha.animateTo(1f, animationSpec = tween(300))
+        logoScale.animateTo(1.2f, animationSpec = tween(400, easing = FastOutSlowInEasing))
+        logoAlpha.animateTo(1f, animationSpec = tween(300))
+        logoScale.animateTo(1f, animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow))
-        alpha.animateTo(1f, animationSpec = tween(500))
-        textAlpha.animateTo(1f, animationSpec = tween(800))
+            stiffness = Spring.StiffnessMedium))
+        launch {
+            delay(200)
+            textOffsetY.animateTo(0f, animationSpec = tween(600, easing = FastOutSlowInEasing))
+            textAlpha.animateTo(1f, animationSpec = tween(400))
+        }
         delay(2500)
         onFinish()
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(D11Black),
+    Box(modifier = Modifier.fillMaxSize()
+        .alpha(bgAlpha.value)
+        .background(Brush.verticalGradient(
+            colors = listOf(Color(0xFF1A0008), D11Red, Color(0xFF8B0000))
+        )),
         contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(modifier = Modifier.scale(scale.value).alpha(alpha.value)
-                .size(130.dp).clip(CircleShape).background(D11Red)
-                .border(3.dp, D11White, CircleShape),
-                contentAlignment = Alignment.Center) {
 
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo),
-                    contentDescription = "Logo",
-                    modifier = Modifier.size(130.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Column(modifier = Modifier.alpha(textAlpha.value),
-                horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("DREAM11", color = D11White, fontSize = 32.sp,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 4.sp)
-                Text("INDIA", color = D11Red, fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 8.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Fantasy Sports", color = D11Gray, fontSize = 14.sp)
-            }
-            Spacer(modifier = Modifier.height(60.dp))
+        Box(modifier = Modifier.scale(logoScale.value).alpha(logoAlpha.value),
+            contentAlignment = Alignment.Center) {
+            Image(painter = painterResource(id = R.drawable.ic_logo),
+                contentDescription = "Logo", modifier = Modifier.size(160.dp))
+        }
+
+        Column(modifier = Modifier.align(Alignment.BottomCenter)
+            .offset(y = textOffsetY.value.dp)
+            .alpha(textAlpha.value)
+            .padding(bottom = 100.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("DREAM11", color = D11White, fontSize = 38.sp,
+                fontWeight = FontWeight.ExtraBold, letterSpacing = 6.sp)
+            Text("INDIA", color = D11White, fontSize = 22.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 10.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Fantasy Sports", color = Color(0xCCFFFFFF), fontSize = 15.sp,
+                letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(32.dp))
             val infiniteTransition = rememberInfiniteTransition(label = "dots")
-            val dot1 = infiniteTransition.animateFloat(0.3f, 1f,
-                infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "d1")
-            val dot2 = infiniteTransition.animateFloat(0.3f, 1f,
-                infiniteRepeatable(tween(600, delayMillis = 200), RepeatMode.Reverse), label = "d2")
-            val dot3 = infiniteTransition.animateFloat(0.3f, 1f,
-                infiniteRepeatable(tween(600, delayMillis = 400), RepeatMode.Reverse), label = "d3")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val dot1 = infiniteTransition.animateFloat(0.2f, 1f,
+                infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "d1")
+            val dot2 = infiniteTransition.animateFloat(0.2f, 1f,
+                infiniteRepeatable(tween(500, delayMillis = 166), RepeatMode.Reverse), label = "d2")
+            val dot3 = infiniteTransition.animateFloat(0.2f, 1f,
+                infiniteRepeatable(tween(500, delayMillis = 332), RepeatMode.Reverse), label = "d3")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(dot1.value, dot2.value, dot3.value).forEach { a ->
-                    Box(modifier = Modifier.size(10.dp).clip(CircleShape)
-                        .alpha(a).background(D11Red))
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape)
+                        .alpha(a).background(D11White))
                 }
             }
         }
@@ -328,16 +347,10 @@ fun LanguageScreen(onSelect: (Boolean) -> Unit) {
         contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.size(100.dp),
-                contentAlignment = Alignment.Center) {
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo),
-                    contentDescription = "Logo",
-                    modifier = Modifier.size(100.dp)
-                )
-            }
+            Image(painter = painterResource(id = R.drawable.ic_logo),
+                contentDescription = "Logo", modifier = Modifier.size(100.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            Text("DREAM11 INDIA", color = D11White, fontSize = 22.sp,
+            Text("DREAM11 INDIA", color = D11White, fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold, letterSpacing = 3.sp)
             Text("Fantasy Sports", color = D11Gray, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(48.dp))
@@ -370,18 +383,13 @@ fun PhoneScreen(activity: ComponentActivity, onOtpSent: (String, String) -> Unit
     var error by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().background(D11Black)) {
-        Box(modifier = Modifier.fillMaxWidth().background(D11Red).padding(vertical = 32.dp),
+        Box(modifier = Modifier.fillMaxWidth().background(D11Red)
+            .statusBarsPadding().padding(vertical = 24.dp),
             contentAlignment = Alignment.Center) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(52.dp),
-                    contentAlignment = Alignment.Center) {
-                    androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_logo),
-                        contentDescription = "Logo",
-                        modifier = Modifier.size(52.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Image(painter = painterResource(id = R.drawable.ic_logo),
+                    contentDescription = "Logo", modifier = Modifier.size(48.dp))
                 Column {
                     Text("DREAM11", color = D11White, fontSize = 26.sp,
                         fontWeight = FontWeight.ExtraBold)
@@ -415,8 +423,7 @@ fun PhoneScreen(activity: ComponentActivity, onOtpSent: (String, String) -> Unit
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     decorationBox = { inner ->
-                        if (phone.isEmpty()) Text("00000 00000", color = D11Gray,
-                            fontSize = 18.sp)
+                        if (phone.isEmpty()) Text("00000 00000", color = D11Gray, fontSize = 18.sp)
                         inner()
                     })
             }
@@ -437,8 +444,7 @@ fun PhoneScreen(activity: ComponentActivity, onOtpSent: (String, String) -> Unit
                         override fun onVerificationFailed(e: FirebaseException) {
                             error = e.message ?: "Failed"; loading = false
                         }
-                        override fun onCodeSent(v: String,
-                                                t: PhoneAuthProvider.ForceResendingToken) {
+                        override fun onCodeSent(v: String, t: PhoneAuthProvider.ForceResendingToken) {
                             loading = false; onOtpSent(v, fullPhone)
                         }
                     }
@@ -451,8 +457,7 @@ fun PhoneScreen(activity: ComponentActivity, onOtpSent: (String, String) -> Unit
                 colors = ButtonDefaults.buttonColors(containerColor = D11Red),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                if (loading) CircularProgressIndicator(color = D11White,
-                    modifier = Modifier.size(24.dp))
+                if (loading) CircularProgressIndicator(color = D11White, modifier = Modifier.size(24.dp))
                 else Text(Lang.getOtp, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
@@ -461,8 +466,7 @@ fun PhoneScreen(activity: ComponentActivity, onOtpSent: (String, String) -> Unit
 
 // ===== OTP SCREEN =====
 @Composable
-fun OtpScreen(phone: String, vid: String,
-              onSuccess: (String) -> Unit, onBack: () -> Unit) {
+fun OtpScreen(phone: String, vid: String, onSuccess: (String) -> Unit, onBack: () -> Unit) {
     var otp by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -473,7 +477,8 @@ fun OtpScreen(phone: String, vid: String,
     }
 
     Column(modifier = Modifier.fillMaxSize().background(D11Black)) {
-        Box(modifier = Modifier.fillMaxWidth().background(D11Red).padding(vertical = 20.dp),
+        Box(modifier = Modifier.fillMaxWidth().background(D11Red)
+            .statusBarsPadding().padding(vertical = 20.dp),
             contentAlignment = Alignment.Center) {
             Text(Lang.verifyOtp, color = D11White, fontSize = 18.sp,
                 fontWeight = FontWeight.Bold)
@@ -510,17 +515,14 @@ fun OtpScreen(phone: String, vid: String,
                     loading = true
                     val cred = PhoneAuthProvider.getCredential(vid, otp)
                     FirebaseAuth.getInstance().signInWithCredential(cred)
-                        .addOnSuccessListener { result ->
-                            onSuccess(result.user?.uid ?: "")
-                        }
+                        .addOnSuccessListener { result -> onSuccess(result.user?.uid ?: "") }
                         .addOnFailureListener { error = Lang.wrongOtp; loading = false }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = D11Red),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                if (loading) CircularProgressIndicator(color = D11White,
-                    modifier = Modifier.size(24.dp))
+                if (loading) CircularProgressIndicator(color = D11White, modifier = Modifier.size(24.dp))
                 else Text(Lang.verify, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -547,6 +549,3 @@ fun CountdownTimer(hoursLeft: Int, minutesLeft: Int) {
             color = timeColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
-
-
-

@@ -10,40 +10,45 @@
         android:pathData="M100,100m-100,0a100,100 0,1 1,200 0a100,100 0,1 1,-200 0"
         android:fillColor="#D4002A"/>
 
-    <!-- Trophy body white -->
+    <!-- Shield white -->
     <path
-        android:pathData="M100,40 L140,40 L140,110 Q140,130 125,140 Q115,146 107,150 L100,155 L93,150 Q85,146 75,140 Q60,130 60,110 L60,40 Z"
+        android:pathData="M100,15 L167,38 L167,102 Q167,145 100,175 Q33,145 33,102 L33,38 Z"
         android:fillColor="#FFFFFF"/>
 
-    <!-- Left handle -->
+    <!-- Trophy cup red -->
     <path
-        android:pathData="M60,50 Q40,50 40,75 Q40,95 60,98"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="12"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"/>
-
-    <!-- Right handle -->
-    <path
-        android:pathData="M140,50 Q160,50 160,75 Q160,95 140,98"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="12"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"/>
-
-    <!-- Stem -->
-    <path
-        android:pathData="M93,155 L107,155 L107,168 L93,168 Z"
-        android:fillColor="#FFFFFF"/>
-
-    <!-- Base -->
-    <path
-        android:pathData="M80,168 L120,168 L120,175 L80,175 Z"
-        android:fillColor="#FFFFFF"/>
-
-    <!-- D letter red -->
-    <path
-        android:pathData="M80,58 L80,118 L100,118 Q122,118 122,88 Q122,58 100,58 Z M92,68 L100,68 Q110,68 110,88 Q110,108 100,108 L92,108 Z"
+        android:pathData="M70,47 L130,47 L130,108 Q130,130 113,140 L100,148 L87,140 Q70,130 70,108 Z"
         android:fillColor="#D4002A"/>
+
+    <!-- Left handle red -->
+    <path
+        android:pathData="M70,60 Q48,60 48,86 Q48,106 70,110"
+        android:strokeColor="#D4002A"
+        android:strokeWidth="13"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"/>
+
+    <!-- Right handle red -->
+    <path
+        android:pathData="M130,60 Q152,60 152,86 Q152,106 130,110"
+        android:strokeColor="#D4002A"
+        android:strokeWidth="13"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"/>
+
+    <!-- Stem red -->
+    <path
+        android:pathData="M95,148 L105,148 L105,163 L95,163 Z"
+        android:fillColor="#D4002A"/>
+
+    <!-- Base red -->
+    <path
+        android:pathData="M82,163 L118,163 L118,172 L82,172 Z"
+        android:fillColor="#D4002A"/>
+
+    <!-- D letter white -->
+    <path
+        android:pathData="M78,55 L78,128 L102,128 Q126,128 126,91 Q126,55 102,55 Z M93,68 L101,68 Q113,68 113,91 Q113,114 101,114 L93,114 Z"
+        android:fillColor="#FFFFFF"/>
 
 </vector>
