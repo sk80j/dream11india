@@ -392,3 +392,152 @@ fun AdminStatsTab() {
         }
     }
 }
+@Composable
+fun AdminWithdrawTab() {
+    val db = FirebaseFirestore.getInstance()
+    var requests by remember { mutableStateOf<List<WithdrawRequest>>(emptyList()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var snackMsg by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        db.collection("withdrawRequests")
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snap, _ ->
+                snap?.let {
+                    requests = it.documents.map { doc ->
+                        WithdrawRequest(
+                            id = doc.id,
+                            userId = doc.getString("userId") ?: "",
+                            amount = doc.getLong("amount")?.toInt() ?: 0,
+                            upiId = doc.getString("upiId") ?: "",
+                            status = doc.getString("status") ?: "pending",
+                            createdAt = doc.getLong("createdAt") ?: 0L
+                        )
+                    }
+                }
+            }
+    }
+
+    LaunchedEffect(snackMsg) {
+        if (snackMsg.isNotEmpty()) {
+            snackbarHostState.showSnackbar(snackMsg)
+            snackMsg = ""
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+        LazyColumn(contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(padding)) {
+            item {
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "Total" to requests.size.toString() to D11White,
+                        "Pending" to requests.count { it.status == "pending" }.toString() to D11Yellow,
+                        "Approved" to requests.count { it.status == "approved" }.toString() to D11Green,
+                        "Rejected" to requests.count { it.status == "rejected" }.toString() to D11Red
+                    ).forEach { (labelValue, color) ->
+                        val (label, value) = labelValue
+                        Card(modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = D11CardBg),
+                            shape = RoundedCornerShape(8.dp)) {
+                            Column(modifier = Modifier.padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(value, color = color, fontSize = 18.sp,
+                                    fontWeight = FontWeight.ExtraBold)
+                                Text(label, color = D11Gray, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            }
+            items(requests) { req ->
+                Card(modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when(req.status) {
+                            "approved" -> Color(0xFF0A2A0A)
+                            "rejected" -> Color(0xFF2A0A0A)
+                            else -> D11CardBg
+                        }),
+                    shape = RoundedCornerShape(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Column {
+                                Text("User: ${req.userId.take(10)}...",
+                                    color = D11White, fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold)
+                                Text("UPI: ${req.upiId}", color = D11Gray, fontSize = 12.sp)
+                            }
+                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                                .background(when(req.status) {
+                                    "approved" -> Color(0xFF004400)
+                                    "rejected" -> Color(0xFF440000)
+                                    else -> Color(0xFF444400)
+                                }).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                                Text(req.status.uppercase(),
+                                    color = when(req.status) {
+                                        "approved" -> D11Green
+                                        "rejected" -> D11Red
+                                        else -> D11Yellow
+                                    }, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Rs.${req.amount}", color = D11Yellow,
+                            fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                        if (req.status == "pending") {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = {
+                                    db.collection("withdrawRequests")
+                                        .document(req.id)
+                                        .update("status", "rejected")
+                                        .addOnSuccessListener { snackMsg = "Rejected!" }
+                                }, modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF330000)),
+                                    shape = RoundedCornerShape(8.dp)) {
+                                    Text("Reject", color = D11Red, fontWeight = FontWeight.Bold)
+                                }
+                                Button(onClick = {
+                                    db.collection("users").document(req.userId)
+                                        .get()
+                                        .addOnSuccessListener { userSnap ->
+                                            val bal = userSnap.getLong("balance")?.toInt() ?: 0
+                                            if (bal >= req.amount) {
+                                                db.collection("users").document(req.userId)
+                                                    .update("balance", bal - req.amount)
+                                                db.collection("transactions").add(mapOf(
+                                                    "userId" to req.userId,
+                                                    "type" to "debit",
+                                                    "amount" to req.amount,
+                                                    "description" to "Withdrawal approved",
+                                                    "timestamp" to System.currentTimeMillis()
+                                                ))
+                                                db.collection("withdrawRequests")
+                                                    .document(req.id)
+                                                    .update("status", "approved")
+                                                snackMsg = "Approved! Rs.${req.amount} deducted."
+                                            } else {
+                                                snackMsg = "User has insufficient balance!"
+                                            }
+                                        }
+                                }, modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF004400)),
+                                    shape = RoundedCornerShape(8.dp)) {
+                                    Text("Approve", color = D11Green,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
