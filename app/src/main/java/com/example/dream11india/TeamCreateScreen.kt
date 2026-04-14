@@ -85,6 +85,42 @@ fun TeamCreateScreen(
     var captainId by remember { mutableStateOf("") }
     var viceCaptainId by remember { mutableStateOf("") }
     var showCVCScreen by remember { mutableStateOf(false) }
+    var isLoadingPlayers by remember { mutableStateOf(false) }
+    var apiError by remember { mutableStateOf("") }
+
+    // Load real players from API
+    LaunchedEffect(matchTitle) {
+        isLoadingPlayers = true
+        try {
+            // Try to get matchId from title
+            val matchId = "95001" // Default IPL match ID
+            val response = CricbuzzApi.service.getMatchCenter(matchId)
+
+            val realPlayers = mutableListOf<Player>()
+
+            val t1Short = response.team1?.teamSName ?: team1.take(3)
+            val t2Short = response.team2?.teamSName ?: team2.take(3)
+
+            response.team1?.players?.forEach { p ->
+                if (realPlayers.size < 15) {
+                    realPlayers.add(convertToPlayer(p, team1, t1Short))
+                }
+            }
+            response.team2?.players?.forEach { p ->
+                if (realPlayers.size < 22) {
+                    realPlayers.add(convertToPlayer(p, team2, t2Short))
+                }
+            }
+
+            if (realPlayers.isNotEmpty()) {
+                allPlayers.clear()
+                allPlayers.addAll(realPlayers)
+            }
+        } catch (e: Exception) {
+            apiError = "Using sample players"
+        }
+        isLoadingPlayers = false
+    }
     var sortType by remember { mutableStateOf(SortType.POINTS) }
     val listState = rememberLazyListState()
 
