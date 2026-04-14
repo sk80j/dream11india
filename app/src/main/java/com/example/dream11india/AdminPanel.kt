@@ -541,3 +541,150 @@ fun AdminWithdrawTab() {
         }
     }
 }
+
+@Composable
+fun AdminKYCTab() {
+    val db = FirebaseFirestore.getInstance()
+    var requests by remember { mutableStateOf<List<KycData>>(emptyList()) }
+    var snackMsg by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(snackMsg) {
+        if (snackMsg.isNotEmpty()) {
+            snackbarHostState.showSnackbar(snackMsg)
+            snackMsg = ""
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        db.collection("kyc_requests")
+            .addSnapshotListener { snap, _ ->
+                snap?.let {
+                    requests = it.documents.map { doc ->
+                        KycData(
+                            userId = doc.getString("userId") ?: "",
+                            name = doc.getString("name") ?: "",
+                            panNumber = doc.getString("panNumber") ?: "",
+                            panImageUrl = doc.getString("panImageUrl") ?: "",
+                            selfieUrl = doc.getString("selfieUrl") ?: "",
+                            upiId = doc.getString("upiId") ?: "",
+                            status = doc.getString("status") ?: "pending",
+                            submittedAt = doc.getLong("submittedAt") ?: 0L
+                        )
+                    }
+                }
+            }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+        LazyColumn(contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(padding)) {
+
+            item {
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "Total" to requests.size.toString() to D11White,
+                        "Pending" to requests.count { it.status == "pending" }.toString() to D11Yellow,
+                        "Approved" to requests.count { it.status == "approved" }.toString() to D11Green,
+                        "Rejected" to requests.count { it.status == "rejected" }.toString() to D11Red
+                    ).forEach { (lv, color) ->
+                        val (label, value) = lv
+                        Card(modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = D11CardBg),
+                            shape = RoundedCornerShape(8.dp)) {
+                            Column(modifier = Modifier.padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(value, color = color, fontSize = 18.sp,
+                                    fontWeight = FontWeight.ExtraBold)
+                                Text(label, color = D11Gray, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            items(requests) { kyc ->
+                Card(modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when(kyc.status) {
+                            "approved" -> Color(0xFF0A2A0A)
+                            "rejected" -> Color(0xFF2A0A0A)
+                            else -> D11CardBg
+                        }),
+                    shape = RoundedCornerShape(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
+                                Text(kyc.name, color = D11White, fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold)
+                                Text("PAN: ${kyc.panNumber}", color = D11Gray, fontSize = 12.sp)
+                                Text("UPI: ${kyc.upiId}", color = D11Gray, fontSize = 12.sp)
+                                Text("ID: ${kyc.userId.take(12)}...",
+                                    color = D11Gray, fontSize = 11.sp)
+                            }
+                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                                .background(when(kyc.status) {
+                                    "approved" -> Color(0xFF004400)
+                                    "rejected" -> Color(0xFF440000)
+                                    else -> Color(0xFF444400)
+                                }).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                                Text(kyc.status.uppercase(),
+                                    color = when(kyc.status) {
+                                        "approved" -> D11Green
+                                        "rejected" -> D11Red
+                                        else -> D11Yellow
+                                    }, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        if (kyc.status == "pending") {
+                            Row(modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = {
+                                    db.collection("kyc_requests").document(kyc.userId)
+                                        .update("status", "rejected")
+                                    db.collection("users").document(kyc.userId)
+                                        .update(mapOf(
+                                            "kycStatus" to "rejected",
+                                            "kycRejectionReason" to "Invalid documents"
+                                        ))
+                                    InAppNotificationManager.sendNotification(
+                                        kyc.userId, "KYC Rejected",
+                                        "Please resubmit with valid documents.", "wallet")
+                                    snackMsg = "KYC Rejected!"
+                                }, modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF330000)),
+                                    shape = RoundedCornerShape(8.dp)) {
+                                    Text("Reject", color = D11Red, fontWeight = FontWeight.Bold)
+                                }
+                                Button(onClick = {
+                                    db.collection("kyc_requests").document(kyc.userId)
+                                        .update("status", "approved")
+                                    db.collection("users").document(kyc.userId)
+                                        .update(mapOf(
+                                            "kycStatus" to "approved",
+                                            "kycVerifiedAt" to System.currentTimeMillis()
+                                        ))
+                                    InAppNotificationManager.sendNotification(
+                                        kyc.userId, "KYC Approved!",
+                                        "You can now withdraw your winnings!", "wallet")
+                                    snackMsg = "KYC Approved!"
+                                }, modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF004400)),
+                                    shape = RoundedCornerShape(8.dp)) {
+                                    Text("Approve", color = D11Green, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

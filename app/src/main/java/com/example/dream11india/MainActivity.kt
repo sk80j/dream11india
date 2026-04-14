@@ -99,7 +99,9 @@ data class UserData(
     val winnings: Int = 0,
     val matchesPlayed: Int = 0,
     val teamsCreated: Int = 0,
-    val isAdmin: Boolean = false
+    val isAdmin: Boolean = false,
+    val kycStatus: String = "none",
+    val fcmToken: String = ""
 )
 
 val sampleMatches = listOf(
@@ -154,7 +156,9 @@ fun Dream11App(activity: ComponentActivity) {
                             winnings = it.getLong("winnings")?.toInt() ?: 0,
                             matchesPlayed = it.getLong("matchesPlayed")?.toInt() ?: 0,
                             teamsCreated = it.getLong("teamsCreated")?.toInt() ?: 0,
-                            isAdmin = it.getBoolean("isAdmin") ?: false
+                            isAdmin = it.getBoolean("isAdmin") ?: false,
+                            kycStatus = it.getString("kycStatus") ?: "none",
+                            fcmToken = it.getString("fcmToken") ?: ""
                         )
                     }
                 }
@@ -263,6 +267,7 @@ fun Dream11App(activity: ComponentActivity) {
             onLogout = { screen = "language"; backStack.clear() }
         )
         "admin" -> AdminPanelScreen(onBack = { goBack() })
+        "kyc" -> KYCScreen(userData = userData, onBack = { goBack() })
         "admin_payment" -> AdminPaymentPanel(onBack = { goBack() })
         "leaderboard" -> LeaderboardScreen(
             matchTitle = "${currentMatch.team1} vs ${currentMatch.team2}",
@@ -548,6 +553,12 @@ fun CountdownTimer(hoursLeft: Int, minutesLeft: Int) {
             color = timeColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
+
+
+
+
+
+
 
 
 
