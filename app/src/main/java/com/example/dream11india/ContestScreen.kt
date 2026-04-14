@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -26,20 +25,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 data class ContestData(
     val id: String = "",
-    val name: String,
-    val prize: String,
-    val spots: String,
-    val spotsLeft: String,
-    val fillPercent: Int,
-    val entryFee: String,
+    val name: String = "",
+    val prize: String = "",
+    val spots: String = "",
+    val spotsLeft: String = "",
+    val fillPercent: Int = 0,
+    val entryFee: String = "",
     val entryFeeInt: Int = 0,
-    val isFree: Boolean,
-    val isHot: Boolean,
-    val winners: String,
-    val firstPrize: String,
+    val isFree: Boolean = false,
+    val isHot: Boolean = false,
+    val winners: String = "",
+    val firstPrize: String = "",
     val isGuaranteed: Boolean = false
 )
 
@@ -55,6 +56,11 @@ fun ContestScreen(
     var selectedFilter by remember { mutableStateOf("All") }
     var showJoinDialog by remember { mutableStateOf(false) }
     var selectedContest by remember { mutableStateOf<ContestData?>(null) }
+    var isJoining by remember { mutableStateOf(false) }
+    var joinSuccess by remember { mutableStateOf(false) }
+    var joinError by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val team1 = matchTitle.split(" vs ").getOrElse(0) { "T1" }.trim()
     val team2 = matchTitle.split(" vs ").getOrElse(1) { "T2" }.trim()
@@ -65,7 +71,6 @@ fun ContestScreen(
         ContestData("3","Small League","Rs.10 Crores","45,000","24,750",45,"Rs.19",19,false,false,"8,000","Rs.20 Lakh",false),
         ContestData("4","Free Contest","Rs.1 Lakh","25,000","20,000",20,"FREE",0,true,false,"5,000","Rs.10,000",false),
         ContestData("5","Head to Head","Rs.90","2","1",50,"Rs.49",49,false,false,"1","Rs.90",false),
-        ContestData("6","Practice Contest","No Prize","50,000","35,000",30,"FREE",0,true,false,"0","No Prize",false),
     )
 
     val filteredContests = when(selectedFilter) {
@@ -76,45 +81,142 @@ fun ContestScreen(
         else -> allContests
     }
 
-    // Join Dialog
+    // JOIN CONTEST FUNCTION
+    fun joinContest(contest: ContestData) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val db = FirebaseFirestore.getInstance()
+        isJoining = true
+        joinError = ""
+
+        scope.launch {
+            try {
+                val userRef = db.collection("users").document(uid)
+                val contestRef = db.collection("contests").document(contest.id)
+                val joinedRef = db.collection("joined_contests")
+                    .document("${uid}_${contest.id}")
+
+                db.runTransaction { transaction ->
+                    val userSnap = transaction.get(userRef)
+                    val balance = userSnap.getLong("balance")?.toInt() ?: 0
+
+                    // Check balance
+                    if (balance < contest.entryFeeInt && !contest.isFree) {
+                        throw Exception("Insufficient balance! Add money to wallet.")
+                    }
+
+                    // Check already joined
+                    val joinedSnap = transaction.get(joinedRef)
+                    if (joinedSnap.exists()) {
+                        throw Exception("Already joined this contest!")
+                    }
+
+                    // Deduct balance
+                    if (!contest.isFree) {
+                        transaction.update(userRef, "balance",
+                            balance - contest.entryFeeInt)
+                    }
+
+                    // Save join record
+                    transaction.set(joinedRef, mapOf(
+                        "userId" to uid,
+                        "contestId" to contest.id,
+                        "matchId" to matchId,
+                        "contestName" to contest.name,
+                        "entryFee" to contest.entryFeeInt,
+                        "points" to 0,
+                        "rank" to 0,
+                        "joinedAt" to System.currentTimeMillis()
+                    ))
+
+                    // Save transaction record
+                    if (!contest.isFree) {
+                        val txnRef = db.collection("transactions").document()
+                        transaction.set(txnRef, mapOf(
+                            "userId" to uid,
+                            "type" to "debit",
+                            "amount" to contest.entryFeeInt,
+                            "description" to "Joined ${contest.name}",
+                            "timestamp" to System.currentTimeMillis()
+                        ))
+                    }
+                }.await()
+
+                isJoining = false
+                joinSuccess = true
+                showJoinDialog = false
+                snackbarHostState.showSnackbar("Successfully joined ${contest.name}!")
+                onJoin(contest.name)
+
+            } catch (e: Exception) {
+                isJoining = false
+                joinError = e.message ?: "Failed to join contest"
+            }
+        }
+    }
+
+    // JOIN DIALOG
     if (showJoinDialog && selectedContest != null) {
         AlertDialog(
-            onDismissRequest = { showJoinDialog = false },
+            onDismissRequest = { if (!isJoining) showJoinDialog = false },
             containerColor = D11CardBg,
+            shape = RoundedCornerShape(16.dp),
             title = {
-                Text("Join Contest", color = D11White, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Image(painter = painterResource(id = R.drawable.ic_logo),
+                        contentDescription = null, modifier = Modifier.size(24.dp))
+                    Text("Join Contest", color = D11White,
+                        fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(selectedContest!!.name, color = D11Yellow,
-                        fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                     HorizontalDivider(color = D11Border)
+
                     Row(modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Entry Fee:", color = D11Gray)
+                        Text("Entry Fee:", color = D11Gray, fontSize = 14.sp)
                         Text(selectedContest!!.entryFee, color = D11White,
-                            fontWeight = FontWeight.Bold)
+                            fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                     }
                     Row(modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Your Balance:", color = D11Gray)
+                        Text("Your Balance:", color = D11Gray, fontSize = 14.sp)
                         Text("Rs.${userData.balance}", color = D11Green,
-                            fontWeight = FontWeight.Bold)
+                            fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                     }
                     Row(modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Prize Pool:", color = D11Gray)
+                        Text("Prize Pool:", color = D11Gray, fontSize = 14.sp)
                         Text(selectedContest!!.prize, color = D11Yellow,
-                            fontWeight = FontWeight.Bold)
+                            fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                     }
-                    if (userData.balance < selectedContest!!.entryFeeInt) {
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("1st Prize:", color = D11Gray, fontSize = 14.sp)
+                        Text(selectedContest!!.firstPrize, color = D11Green,
+                            fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                    }
+
+                    if (userData.balance < selectedContest!!.entryFeeInt && !selectedContest!!.isFree) {
                         Box(modifier = Modifier.fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF2A0000))
-                            .padding(8.dp)) {
-                            Text("Insufficient balance! Add money to wallet.",
+                            .padding(10.dp)) {
+                            Text("Insufficient balance! Please add money to wallet.",
                                 color = D11Red, fontSize = 12.sp,
                                 textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+
+                    if (joinError.isNotEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF2A0000)).padding(10.dp)) {
+                            Text(joinError, color = D11Red, fontSize = 12.sp,
                                 modifier = Modifier.fillMaxWidth())
                         }
                     }
@@ -122,21 +224,26 @@ fun ContestScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        showJoinDialog = false
-                        onJoin(selectedContest!!.name)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = D11Red),
-                    enabled = userData.balance >= selectedContest!!.entryFeeInt ||
-                            selectedContest!!.isFree
+                    onClick = { joinContest(selectedContest!!) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedContest!!.isFree) D11Green else D11Red),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isJoining && (selectedContest!!.isFree ||
+                            userData.balance >= selectedContest!!.entryFeeInt)
                 ) {
-                    Text("Join Now", color = D11White, fontWeight = FontWeight.Bold)
+                    if (isJoining) {
+                        CircularProgressIndicator(color = D11White,
+                            modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Join Now", color = D11White, fontWeight = FontWeight.ExtraBold)
+                    }
                 }
             },
             dismissButton = {
                 OutlinedButton(
-                    onClick = { showJoinDialog = false },
-                    border = androidx.compose.foundation.BorderStroke(1.dp, D11Gray)
+                    onClick = { if (!isJoining) showJoinDialog = false },
+                    border = androidx.compose.foundation.BorderStroke(1.dp, D11Gray),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Cancel", color = D11Gray)
                 }
@@ -144,172 +251,153 @@ fun ContestScreen(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0D0D0D))) {
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+        Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0D0D0D))
+            .padding(padding)) {
 
-        // TOP SCORE CARD
-        Box(modifier = Modifier.fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF0D0D2E), Color(0xFF1A1A3A))
-                )
-            )) {
-            Column(modifier = Modifier.statusBarsPadding().padding(16.dp)) {
-
-                // Back + Logo + Title
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("←", color = D11White, fontSize = 24.sp,
-                            modifier = Modifier.clickable { onBack() })
-                        Image(painter = painterResource(id = R.drawable.ic_logo),
-                            contentDescription = "Logo", modifier = Modifier.size(26.dp))
-                        Column {
-                            Text(matchTitle, color = D11White, fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold)
-                            Text("T20 - IPL 2026", color = D11Gray, fontSize = 11.sp)
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF333355))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)) {
-                            Text("PTS", color = D11White, fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold)
-                        }
-                        Box(modifier = Modifier.size(30.dp).clip(CircleShape)
-                            .border(1.dp, D11Gray, CircleShape),
-                            contentAlignment = Alignment.Center) {
-                            Text("?", color = D11White, fontSize = 13.sp)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Live Score
-                Row(modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
-
-                    // Team 1
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.size(42.dp).clip(CircleShape)
-                            .background(Color(0xFF003366)),
-                            contentAlignment = Alignment.Center) {
-                            Text(team1.take(3).uppercase(), color = D11White,
-                                fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Column {
-                            Text(team1, color = D11Gray, fontSize = 12.sp)
-                            Text("186/5", color = D11White, fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold)
-                            Text("(20.0 ov)", color = D11Gray, fontSize = 11.sp)
-                        }
-                    }
-
-                    // Center
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
-                            .background(D11Green)
-                            .padding(horizontal = 10.dp, vertical = 4.dp)) {
-                            Text("LIVE", color = D11White, fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold)
-                        }
-                        Text("vs", color = D11Gray, fontSize = 12.sp)
-                    }
-
-                    // Team 2
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(team2, color = D11Gray, fontSize = 12.sp)
-                            Text("142/3", color = D11White, fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold)
-                            Text("(14.0 ov)", color = D11Gray, fontSize = 11.sp)
-                        }
-                        Box(modifier = Modifier.size(42.dp).clip(CircleShape)
-                            .background(Color(0xFF006600)),
-                            contentAlignment = Alignment.Center) {
-                            Text(team2.take(3).uppercase(), color = D11White,
-                                fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Status
-                Box(modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x33FFFFFF))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)) {
+            // TOP BAR
+            Box(modifier = Modifier.fillMaxWidth()
+                .background(Brush.verticalGradient(
+                    colors = listOf(Color(0xFF0D0D2E), Color(0xFF1A1A3A))))) {
+                Column(modifier = Modifier.statusBarsPadding().padding(16.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(6.dp).clip(CircleShape)
-                            .background(D11Green))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("$team1 need 45 runs in 36 balls",
-                            color = D11White, fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("<", color = D11White, fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable { onBack() })
+                            Image(painter = painterResource(id = R.drawable.ic_logo),
+                                contentDescription = "Logo", modifier = Modifier.size(26.dp))
+                            Column {
+                                Text(matchTitle, color = D11White, fontSize = 15.sp,
+                                    fontWeight = FontWeight.ExtraBold)
+                                Text("T20 - IPL 2026", color = D11Gray, fontSize = 11.sp)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF2A2A44))
+                                .padding(horizontal = 10.dp, vertical = 5.dp)) {
+                                Text("Rs.${userData.balance}", color = D11Green,
+                                    fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Live Score
+                    Row(modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(modifier = Modifier.size(42.dp).clip(CircleShape)
+                                .background(Color(0xFF003366)),
+                                contentAlignment = Alignment.Center) {
+                                Text(team1.take(3).uppercase(), color = D11White,
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column {
+                                Text(team1, color = D11Gray, fontSize = 12.sp)
+                                Text("186/5", color = D11White, fontSize = 22.sp,
+                                    fontWeight = FontWeight.ExtraBold)
+                                Text("(20.0 ov)", color = D11Gray, fontSize = 11.sp)
+                            }
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                                .background(D11Green)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)) {
+                                Text("LIVE", color = D11White, fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold)
+                            }
+                            Text("vs", color = D11Gray, fontSize = 12.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(team2, color = D11Gray, fontSize = 12.sp)
+                                Text("142/3", color = D11White, fontSize = 22.sp,
+                                    fontWeight = FontWeight.ExtraBold)
+                                Text("(14.0 ov)", color = D11Gray, fontSize = 11.sp)
+                            }
+                            Box(modifier = Modifier.size(42.dp).clip(CircleShape)
+                                .background(Color(0xFF006600)),
+                                contentAlignment = Alignment.Center) {
+                                Text(team2.take(3).uppercase(), color = D11White,
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x33FFFFFF))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(D11Green))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("$team1 need 45 runs in 36 balls",
+                                color = D11White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
-        }
 
-        // TABS
-        Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)),
-            horizontalArrangement = Arrangement.SpaceEvenly) {
-            listOf(
-                "contests" to "Contests",
-                "my_teams" to "My Teams",
-                "leaderboard" to "Leaderboard",
-                "scorecard" to "Scorecard"
-            ).forEach { (tab, label) ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { selectedTab = tab }
-                        .padding(horizontal = 8.dp, vertical = 10.dp)) {
-                    Text(label,
-                        color = if (selectedTab == tab) D11Red else D11Gray,
-                        fontSize = 12.sp,
-                        fontWeight = if (selectedTab == tab) FontWeight.Bold
-                        else FontWeight.Normal)
-                    if (selectedTab == tab) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Box(modifier = Modifier.width(40.dp).height(2.dp).background(D11Red))
+            // TABS
+            Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)),
+                horizontalArrangement = Arrangement.SpaceEvenly) {
+                listOf("contests" to "Contests","my_teams" to "My Teams",
+                    "leaderboard" to "Leaderboard","scorecard" to "Scorecard")
+                    .forEach { (tab, label) ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.clickable { selectedTab = tab }
+                                .padding(horizontal = 8.dp, vertical = 10.dp)) {
+                            Text(label,
+                                color = if (selectedTab == tab) D11Red else D11Gray,
+                                fontSize = 12.sp,
+                                fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal)
+                            if (selectedTab == tab) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Box(modifier = Modifier.width(40.dp).height(2.dp).background(D11Red))
+                            }
+                        }
                     }
-                }
             }
-        }
 
-        HorizontalDivider(color = D11Border)
+            HorizontalDivider(color = D11Border)
 
-        when (selectedTab) {
-            "contests" -> ContestsList(
-                contests = filteredContests,
-                selectedFilter = selectedFilter,
-                onFilterChange = { selectedFilter = it },
-                onJoin = { contest ->
-                    selectedContest = contest
-                    showJoinDialog = true
-                }
-            )
-            "leaderboard" -> LeaderboardTab()
-            "my_teams" -> MyTeamsTab()
-            else -> ContestsList(
-                contests = filteredContests,
-                selectedFilter = selectedFilter,
-                onFilterChange = { selectedFilter = it },
-                onJoin = { contest ->
-                    selectedContest = contest
-                    showJoinDialog = true
-                }
-            )
+            when (selectedTab) {
+                "contests" -> ContestsList(
+                    contests = filteredContests,
+                    selectedFilter = selectedFilter,
+                    onFilterChange = { selectedFilter = it },
+                    onJoin = { contest ->
+                        selectedContest = contest
+                        joinError = ""
+                        showJoinDialog = true
+                    }
+                )
+                "leaderboard" -> LeaderboardTab()
+                "my_teams" -> MyTeamsTab()
+                else -> ContestsList(
+                    contests = filteredContests,
+                    selectedFilter = selectedFilter,
+                    onFilterChange = { selectedFilter = it },
+                    onJoin = { contest ->
+                        selectedContest = contest
+                        joinError = ""
+                        showJoinDialog = true
+                    }
+                )
+            }
         }
     }
 }
@@ -321,19 +409,13 @@ fun ContestsList(
     onFilterChange: (String) -> Unit,
     onJoin: (ContestData) -> Unit
 ) {
-    LazyColumn(
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Banner
+    LazyColumn(contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Box(modifier = Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color(0xFF0D0D2E), Color(0xFF1A1A4A))
-                    )
-                )
+                .background(Brush.horizontalGradient(
+                    colors = listOf(Color(0xFF0D0D2E), Color(0xFF1A1A4A))))
                 .border(1.dp, Color(0xFF333366), RoundedCornerShape(12.dp))
                 .padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(),
@@ -358,34 +440,25 @@ fun ContestsList(
             }
         }
 
-        // Filter tabs
         item {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp)
-            ) {
-                items(listOf("All", "Mega", "Small", "Free", "H2H")) { filter ->
-                    Box(modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            if (selectedFilter == filter) D11Red
-                            else Color(0xFF2A2A2A)
-                        )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)) {
+                items(listOf("All","Mega","Small","Free","H2H")) { filter ->
+                    Box(modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                        .background(if (selectedFilter == filter) D11Red else Color(0xFF2A2A2A))
                         .clickable { onFilterChange(filter) }
                         .padding(horizontal = 16.dp, vertical = 7.dp)) {
-                        Text(filter, color = D11White,
-                            fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(filter, color = D11White, fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        // Stats row
         item {
             Row(modifier = Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF1A1A1A))
-                .padding(12.dp),
+                .background(Color(0xFF1A1A1A)).padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly) {
                 listOf(
                     "${contests.size}" to "Contests",
@@ -411,15 +484,11 @@ fun ContestsList(
 
 @Composable
 fun ContestCard(contest: ContestData, onJoin: () -> Unit) {
-    val scale = remember { Animatable(1f) }
-
     Card(modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(4.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-
-            // Top badges + Join button
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
@@ -429,37 +498,33 @@ fun ContestCard(contest: ContestData, onJoin: () -> Unit) {
                         Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                             .background(Color(0xFF1A3A1A))
                             .padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text("Guaranteed", color = D11Green,
-                                fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("Guaranteed", color = D11Green, fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold)
                         }
                     }
                     if (contest.isHot) {
                         Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                             .background(Color(0xFF3A1500))
                             .padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text("HOT", color = Color(0xFFFF6B35),
-                                fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("HOT", color = Color(0xFFFF6B35), fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold)
                         }
                     }
                     if (contest.isFree) {
                         Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                             .background(Color(0xFF003300))
                             .padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text("FREE", color = D11Green,
-                                fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("FREE", color = D11Green, fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-
-                Button(
-                    onClick = onJoin,
+                Button(onClick = onJoin,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (contest.isFree) D11Green else D11Red
-                    ),
+                        containerColor = if (contest.isFree) D11Green else D11Red),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                    elevation = ButtonDefaults.buttonElevation(4.dp)
-                ) {
+                    elevation = ButtonDefaults.buttonElevation(4.dp)) {
                     Text(contest.entryFee, color = D11White,
                         fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                 }
@@ -467,26 +532,24 @@ fun ContestCard(contest: ContestData, onJoin: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Prize + Spots
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text("Prize Pool", color = D11Gray, fontSize = 11.sp)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(contest.prize, color = D11White,
-                        fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(contest.prize, color = D11White, fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Total Spots", color = D11Gray, fontSize = 11.sp)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(contest.spots, color = D11White,
-                        fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(contest.spots, color = D11White, fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold)
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Progress bar
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("${contest.spotsLeft} spots left",
@@ -497,37 +560,29 @@ fun ContestCard(contest: ContestData, onJoin: () -> Unit) {
             Spacer(modifier = Modifier.height(4.dp))
             Box(modifier = Modifier.fillMaxWidth().height(5.dp)
                 .clip(RoundedCornerShape(2.dp)).background(Color(0xFF333333))) {
-                Box(modifier = Modifier
-                    .fillMaxWidth(contest.fillPercent.toFloat() / 100f)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = if (contest.fillPercent > 80)
-                                listOf(D11Red, Color(0xFFFF6B35))
-                            else listOf(D11Green, Color(0xFF00E676))
-                        )
-                    ))
+                Box(modifier = Modifier.fillMaxWidth(contest.fillPercent.toFloat() / 100f)
+                    .height(5.dp).clip(RoundedCornerShape(2.dp))
+                    .background(Brush.horizontalGradient(
+                        colors = if (contest.fillPercent > 80)
+                            listOf(D11Red, Color(0xFFFF6B35))
+                        else listOf(D11Green, Color(0xFF00E676)))))
             }
 
             Spacer(modifier = Modifier.height(10.dp))
             HorizontalDivider(color = D11Border, thickness = 0.5.dp)
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Winners + 1st prize
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(16.dp).clip(CircleShape)
-                        .background(D11Yellow),
+                    Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(D11Yellow),
                         contentAlignment = Alignment.Center) {
                         Text("W", color = D11Black, fontSize = 8.sp,
                             fontWeight = FontWeight.ExtraBold)
                     }
-                    Text("${contest.winners} Winners",
-                        color = D11Gray, fontSize = 11.sp)
+                    Text("${contest.winners} Winners", color = D11Gray, fontSize = 11.sp)
                 }
                 Text("1st: ${contest.firstPrize}", color = D11Green,
                     fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
@@ -542,23 +597,13 @@ fun MyTeamsTab() {
         contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(modifier = Modifier.size(80.dp).clip(CircleShape)
-                .background(D11LightGray),
+            Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(D11LightGray),
                 contentAlignment = Alignment.Center) {
-                Text("T", color = D11Gray, fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold)
+                Text("T", color = D11Gray, fontSize = 36.sp, fontWeight = FontWeight.Bold)
             }
             Text("No teams created yet", color = D11White, fontSize = 16.sp,
                 fontWeight = FontWeight.Bold)
-            Text("Create a team to join contests",
-                color = D11Gray, fontSize = 13.sp)
-            Button(
-                onClick = { },
-                colors = ButtonDefaults.buttonColors(containerColor = D11Red),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Create Team", color = D11White, fontWeight = FontWeight.Bold)
-            }
+            Text("Create a team to join contests", color = D11Gray, fontSize = 13.sp)
         }
     }
 }
@@ -572,37 +617,21 @@ fun LeaderboardTab() {
         Triple("You", 831.0f, "Rs.500"),
         Triple("Vikram R.", 820.0f, "Rs.200"),
     )
-
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A))) {
-        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF0D0D0D))
-            .padding(12.dp)) {
-            Text("Points last updated at 14.0 overs",
-                color = D11Red, fontSize = 12.sp,
+        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF0D0D0D)).padding(12.dp)) {
+            Text("Points last updated at 14.0 overs", color = D11Red, fontSize = 12.sp,
                 modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         }
-
-        Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF111111))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            Text("Compare", color = D11Gray, fontSize = 12.sp,
-                modifier = Modifier.clickable { })
-            Text("Download", color = D11Gray, fontSize = 12.sp,
-                modifier = Modifier.clickable { })
-        }
-
-        HorizontalDivider(color = D11Border)
-
         Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF111111))
             .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("All Teams (61,50,405)", color = D11White,
-                fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text("All Teams", color = D11White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                 Text("Points", color = D11Gray, fontSize = 12.sp)
                 Text("Rank", color = D11Gray, fontSize = 12.sp)
             }
         }
-
+        HorizontalDivider(color = D11Border)
         LazyColumn {
             items(entries.withIndex().toList()) { (index, entry) ->
                 val (name, points, prize) = entry
@@ -615,36 +644,18 @@ fun LeaderboardTab() {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(44.dp).clip(CircleShape)
-                            .background(
-                                when(index) {
-                                    0 -> D11Yellow
-                                    1 -> Color(0xFFC0C0C0)
-                                    2 -> Color(0xFFCD7F32)
-                                    else -> if (isYou) D11Red else Color(0xFF2A2A2A)
-                                }
-                            ),
-                            contentAlignment = Alignment.Center) {
-                            Text(
-                                if (index < 3) "${index + 1}"
-                                else name.take(2).uppercase(),
+                            .background(when(index) {
+                                0 -> D11Yellow; 1 -> Color(0xFFC0C0C0)
+                                2 -> Color(0xFFCD7F32)
+                                else -> if (isYou) D11Red else Color(0xFF2A2A2A)
+                            }), contentAlignment = Alignment.Center) {
+                            Text(if (index < 3) "${index+1}" else name.take(2).uppercase(),
                                 color = if (index < 3) D11Black else D11White,
-                                fontSize = 14.sp, fontWeight = FontWeight.Bold
-                            )
+                                fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                         Column {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Text(name, color = D11White, fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold)
-                                if (isYou) {
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
-                                        .background(D11Red)
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)) {
-                                        Text("YOU", color = D11White, fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
+                            Text(name, color = D11White, fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold)
                             Text(prize, color = D11Green, fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold)
                         }
@@ -653,7 +664,7 @@ fun LeaderboardTab() {
                         verticalAlignment = Alignment.CenterVertically) {
                         Text("$points", color = D11White, fontSize = 14.sp,
                             fontWeight = FontWeight.Bold)
-                        Text("#${index + 1}",
+                        Text("#${index+1}",
                             color = if (isYou) D11Yellow else D11Gray,
                             fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }

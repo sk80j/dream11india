@@ -214,11 +214,7 @@ fun Dream11App(activity: ComponentActivity) {
             onTabChange = { tab = it },
             onMatchClick = { match ->
                 currentMatch = match
-                if (match.hoursLeft > 0 || match.minutesLeft > 0) {
-                    navigateTo("contest")
-                } else {
-                    navigateTo("live_score")
-                }
+                navigateTo("contest")
             },
             onWalletClick = { navigateTo("wallet") },
             onProfileClick = { navigateTo("profile") },
@@ -549,3 +545,4 @@ fun CountdownTimer(hoursLeft: Int, minutesLeft: Int) {
             color = timeColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
+

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -44,7 +45,9 @@ fun HomeScreen(
     var isLoading by remember { mutableStateOf(true) }
     var selectedLeague by remember { mutableStateOf("All") }
     var selectedFilter by remember { mutableStateOf("All") }
+    var selectedSport by remember { mutableStateOf("Cricket") }
     var bannerIndex by remember { mutableStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -53,6 +56,8 @@ fun HomeScreen(
         Triple("IPL 2026", "Play Now & Win Big!", Color(0xFF1565C0)),
         Triple("FREE CONTEST", "No Entry Fee!", D11Green)
     )
+
+    val sports = listOf("Cricket", "Football", "Kabaddi", "Basketball", "Baseball")
 
     val sampleMatches = listOf(
         CricMatch(id="1", name="RR vs MI",
@@ -151,15 +156,19 @@ fun HomeScreen(
         }
     }
 
-    val filteredMatches = remember(matches, selectedLeague, selectedFilter) {
+    val filteredMatches = remember(matches, selectedLeague, selectedFilter, searchQuery) {
         var list = matches
+        if (searchQuery.isNotEmpty()) {
+            list = list.filter { it.name.contains(searchQuery, true) ||
+                it.teams.any { t -> t.contains(searchQuery, true) } }
+        }
         list = when(selectedLeague) {
             "IPL" -> list.filter { m -> m.teams.any { t ->
                 listOf("Mumbai","Chennai","Royal","Kolkata","Delhi","Punjab",
                     "Rajasthan","Sunrisers","Gujarat","Lucknow").any { t.contains(it,true) }}}
-            "WPL" -> list.filter { it.name.contains("WPL",true) }
-            "T20I" -> list.filter { it.status.contains("T20I",true) }
+            "T20" -> list.filter { it.status.contains("T20",true) }
             "ODI" -> list.filter { it.status.contains("ODI",true) }
+            "Test" -> list.filter { it.status.contains("Test",true) }
             else -> list
         }
         list = when(selectedFilter) {
@@ -176,53 +185,87 @@ fun HomeScreen(
             Column(modifier = Modifier.fillMaxSize()) {
 
                 // TOP BAR
-                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).statusBarsPadding()) {
+                Box(modifier = Modifier.fillMaxWidth()
+                    .background(Color(0xFF1A1A1A)).statusBarsPadding()) {
                     Column {
-                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        Row(modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically) {
+
+                            // Profile + Logo + Name
                             Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Box(modifier = Modifier.size(38.dp).clip(CircleShape).background(D11Red)
-                                    .clickable { onProfileClick() },
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(modifier = Modifier.size(38.dp).clip(CircleShape)
+                                    .background(D11Red).clickable { onProfileClick() },
                                     contentAlignment = Alignment.Center) {
                                     Text((userData.name.firstOrNull() ?: "P").toString().uppercase(),
-                                        color = D11White, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                                        color = D11White, fontSize = 16.sp,
+                                        fontWeight = FontWeight.ExtraBold)
                                 }
                                 Image(painter = painterResource(id = R.drawable.ic_logo),
-                                    contentDescription = "Logo", modifier = Modifier.size(32.dp))
-                                Text("DREAM11", color = D11White, fontSize = 20.sp,
+                                    contentDescription = "Logo", modifier = Modifier.size(30.dp))
+                                Text("DREAM11", color = D11White, fontSize = 18.sp,
                                     fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                             }
+
+                            // Wallet + Icons
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(34.dp).clip(CircleShape)
+                                // Notification
+                                Box(modifier = Modifier.size(32.dp).clip(CircleShape)
                                     .background(Color(0xFF2A2A2A)),
                                     contentAlignment = Alignment.Center) {
-                                    Text("B", color = D11White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("N", color = D11White, fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold)
                                 }
+                                // Referral
+                                Box(modifier = Modifier.size(32.dp).clip(CircleShape)
+                                    .background(Color(0xFF2A2A2A)),
+                                    contentAlignment = Alignment.Center) {
+                                    Text("R", color = D11Yellow, fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                                // Wallet
                                 Box(modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                                    .background(Color(0xFF2A2A2A)).clickable { onWalletClick() }
-                                    .padding(horizontal = 14.dp, vertical = 7.dp)) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    .background(Color(0xFF2A2A2A))
+                                    .clickable { onWalletClick() }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         verticalAlignment = Alignment.CenterVertically) {
                                         Text("Rs.${userData.balance}", color = D11White,
-                                            fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-                                        Box(modifier = Modifier.size(18.dp).clip(CircleShape).background(D11Green),
+                                            fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                                        Box(modifier = Modifier.size(16.dp).clip(CircleShape)
+                                            .background(D11Green),
                                             contentAlignment = Alignment.Center) {
-                                            Text("+", color = D11White, fontSize = 14.sp,
+                                            Text("+", color = D11White, fontSize = 12.sp,
                                                 fontWeight = FontWeight.ExtraBold)
                                         }
                                     }
                                 }
                             }
                         }
-                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Cricket", color = D11White, fontSize = 14.sp,
-                                    fontWeight = FontWeight.ExtraBold)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Box(modifier = Modifier.width(50.dp).height(2.dp).background(D11Red))
+
+                        // SPORT TABS
+                        LazyRow(modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(sports) { sport ->
+                                val isSelected = selectedSport == sport
+                                Column(modifier = Modifier.clickable { selectedSport = sport }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(sport,
+                                        color = if (isSelected) D11White else D11Gray,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.ExtraBold
+                                        else FontWeight.Normal)
+                                    if (isSelected) {
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Box(modifier = Modifier.width(30.dp).height(2.dp)
+                                            .background(D11Red))
+                                    }
+                                }
                             }
                         }
                     }
@@ -234,26 +277,61 @@ fun HomeScreen(
                         LazyColumn(state = listState, modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(bottom = 80.dp)) {
 
+                            // SEARCH BAR
+                            item {
+                                Row(modifier = Modifier.fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(D11White)
+                                    .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("S", color = D11Gray, fontSize = 14.sp)
+                                    androidx.compose.foundation.text.BasicTextField(
+                                        value = searchQuery,
+                                        onValueChange = { searchQuery = it },
+                                        modifier = Modifier.weight(1f),
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            color = Color(0xFF333333), fontSize = 14.sp),
+                                        decorationBox = { inner ->
+                                            if (searchQuery.isEmpty()) {
+                                                Text("Search matches...", color = D11Gray,
+                                                    fontSize = 14.sp)
+                                            }
+                                            inner()
+                                        }
+                                    )
+                                    if (searchQuery.isNotEmpty()) {
+                                        Text("X", color = D11Gray, fontSize = 14.sp,
+                                            modifier = Modifier.clickable { searchQuery = "" })
+                                    }
+                                }
+                            }
+
                             // BANNER
                             item {
                                 Box(modifier = Modifier.fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(banners[bannerIndex].third).height(90.dp),
                                     contentAlignment = Alignment.Center) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(banners[bannerIndex].first, color = D11White,
                                             fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                                        Text(banners[bannerIndex].second, color = Color(0xCCFFFFFF),
-                                            fontSize = 13.sp)
+                                        Text(banners[bannerIndex].second,
+                                            color = Color(0xCCFFFFFF), fontSize = 13.sp)
                                     }
-                                    Row(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                                    Row(modifier = Modifier.align(Alignment.BottomCenter)
+                                        .padding(bottom = 8.dp),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         banners.indices.forEach { i ->
                                             Box(modifier = Modifier
                                                 .size(if (i == bannerIndex) 20.dp else 6.dp, 6.dp)
                                                 .clip(RoundedCornerShape(3.dp))
-                                                .background(if (i == bannerIndex) D11White else Color(0x66FFFFFF)))
+                                                .background(
+                                                    if (i == bannerIndex) D11White
+                                                    else Color(0x66FFFFFF)))
                                         }
                                     }
                                 }
@@ -263,16 +341,19 @@ fun HomeScreen(
                             item {
                                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(listOf("All","IPL","WPL","T20I","ODI")) { league ->
-                                        Box(modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                                    items(listOf("All","IPL","T20","ODI","Test")) { league ->
+                                        Box(modifier = Modifier
+                                            .clip(RoundedCornerShape(20.dp))
                                             .background(if (selectedLeague == league) D11Red else D11White)
                                             .border(1.dp,
-                                                if (selectedLeague == league) D11Red else Color(0xFFDDDDDD),
+                                                if (selectedLeague == league) D11Red
+                                                else Color(0xFFDDDDDD),
                                                 RoundedCornerShape(20.dp))
                                             .clickable { selectedLeague = league }
                                             .padding(horizontal = 18.dp, vertical = 8.dp)) {
                                             Text(league,
-                                                color = if (selectedLeague == league) D11White else Color(0xFF333333),
+                                                color = if (selectedLeague == league) D11White
+                                                else Color(0xFF333333),
                                                 fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
@@ -291,10 +372,12 @@ fun HomeScreen(
                                             Text(filter,
                                                 color = if (isSelected) D11Red else Color(0xFF666666),
                                                 fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal)
+                                                fontWeight = if (isSelected) FontWeight.ExtraBold
+                                                else FontWeight.Normal)
                                             if (isSelected) {
                                                 Spacer(modifier = Modifier.height(3.dp))
-                                                Box(modifier = Modifier.width(30.dp).height(2.dp).background(D11Red))
+                                                Box(modifier = Modifier.width(30.dp).height(2.dp)
+                                                    .background(D11Red))
                                             }
                                         }
                                     }
@@ -309,10 +392,18 @@ fun HomeScreen(
                                         contentAlignment = Alignment.Center) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text("No matches found", color = Color(0xFF888888),
-                                                fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                            Text("Try a different filter", color = Color(0xFFAAAAAA),
-                                                fontSize = 13.sp)
+                                            Text("No matches found",
+                                                color = Color(0xFF888888), fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold)
+                                            Text("Try a different filter",
+                                                color = Color(0xFFAAAAAA), fontSize = 13.sp)
+                                            Button(onClick = { loadMatches() },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = D11Red),
+                                                shape = RoundedCornerShape(8.dp)) {
+                                                Text("Refresh", color = D11White,
+                                                    fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -331,7 +422,8 @@ fun HomeScreen(
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = Color(0xFF333333)),
                                         shape = RoundedCornerShape(8.dp)) {
-                                        Text("Admin Panel", color = D11White, fontWeight = FontWeight.Bold)
+                                        Text("Admin Panel", color = D11White,
+                                            fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -341,7 +433,8 @@ fun HomeScreen(
             }
 
             // BOTTOM NAV
-            Box(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).background(D11White)) {
+            Box(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter)
+                .background(D11White)) {
                 HorizontalDivider(color = Color(0xFFEEEEEE))
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -353,25 +446,30 @@ fun HomeScreen(
                     ).forEach { (tab, label, index) ->
                         val isSelected = currentTab == tab
                         Column(horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clickable { onTabChange(tab) }.padding(horizontal = 12.dp)) {
+                            modifier = Modifier.clickable { onTabChange(tab) }
+                                .padding(horizontal = 12.dp)) {
                             Box(modifier = Modifier.size(30.dp).clip(CircleShape)
                                 .background(if (isSelected) D11Red else Color(0xFFF0F0F0)),
                                 contentAlignment = Alignment.Center) {
                                 when(index) {
                                     0 -> Image(painter = painterResource(id = R.drawable.ic_logo),
                                         contentDescription = null, modifier = Modifier.size(22.dp))
-                                    1 -> Text("M", color = if (isSelected) D11White else Color(0xFF666666),
+                                    1 -> Text("M",
+                                        color = if (isSelected) D11White else Color(0xFF666666),
                                         fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    2 -> Text("D", color = if (isSelected) D11White else Color(0xFF666666),
+                                    2 -> Text("D",
+                                        color = if (isSelected) D11White else Color(0xFF666666),
                                         fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    3 -> Text("G", color = if (isSelected) D11White else Color(0xFF666666),
+                                    3 -> Text("G",
+                                        color = if (isSelected) D11White else Color(0xFF666666),
                                         fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(label, color = if (isSelected) D11Red else Color(0xFF888888),
                                 fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal)
+                                fontWeight = if (isSelected) FontWeight.ExtraBold
+                                else FontWeight.Normal)
                         }
                     }
                 }
@@ -385,10 +483,12 @@ fun ShimmerLoadingUI() {
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val alpha = infiniteTransition.animateFloat(0.3f, 1f,
         infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "a")
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(4) {
             Box(modifier = Modifier.fillMaxWidth().height(160.dp)
-                .clip(RoundedCornerShape(12.dp)).alpha(alpha.value).background(Color(0xFFDDDDDD)))
+                .clip(RoundedCornerShape(12.dp)).alpha(alpha.value)
+                .background(Color(0xFFDDDDDD)))
         }
     }
 }
@@ -415,22 +515,29 @@ fun matchDataFromCric(match: CricMatch): MatchData {
 
 @Composable
 fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
-    val t1Short = match.teamInfo?.getOrNull(0)?.shortname?.ifEmpty { match.teams.getOrElse(0){"T1"}.take(3) }
-        ?: match.teams.getOrElse(0){"T1"}.take(3)
-    val t2Short = match.teamInfo?.getOrNull(1)?.shortname?.ifEmpty { match.teams.getOrElse(1){"T2"}.take(3) }
-        ?: match.teams.getOrElse(1){"T2"}.take(3)
+    val t1Short = match.teamInfo?.getOrNull(0)?.shortname?.ifEmpty {
+        match.teams.getOrElse(0){"T1"}.take(3) } ?: match.teams.getOrElse(0){"T1"}.take(3)
+    val t2Short = match.teamInfo?.getOrNull(1)?.shortname?.ifEmpty {
+        match.teams.getOrElse(1){"T2"}.take(3) } ?: match.teams.getOrElse(1){"T2"}.take(3)
     val team1Full = match.teams.getOrElse(0) { t1Short }
     val team2Full = match.teams.getOrElse(1) { t2Short }
     val isLive = match.matchStarted && !match.matchEnded
     val isCompleted = match.matchEnded
 
-    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-        .clickable { onClick() },
+    // Blinking animation for LIVE
+    val infiniteTransition = rememberInfiniteTransition(label = "live")
+    val liveDotAlpha = infiniteTransition.animateFloat(0.3f, 1f,
+        infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "dot")
+
+    Card(modifier = Modifier.fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 6.dp).clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = D11White),
         shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(3.dp)) {
+        elevation = CardDefaults.cardElevation(3.dp),
+        border = if (isLive) androidx.compose.foundation.BorderStroke(
+            1.dp, Color(0xFFFFCDD2)) else null) {
         Column {
-            // Header
+            // HEADER
             Row(modifier = Modifier.fillMaxWidth()
                 .background(if (isLive) Color(0xFFFFF3F3) else Color(0xFFF8F8F8))
                 .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -441,22 +548,25 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                 when {
                     isLive -> Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(D11Red))
-                        Text("LIVE", color = D11Red, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                        Box(modifier = Modifier.size(7.dp).clip(CircleShape)
+                            .alpha(liveDotAlpha.value).background(D11Red))
+                        Text("LIVE", color = D11Red, fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold)
                     }
                     isCompleted -> Text("Completed", color = Color(0xFF888888), fontSize = 12.sp)
                     else -> CountdownTimer(hoursLeft = 2, minutesLeft = 30)
                 }
             }
 
-            // Teams
+            // TEAMS
             Row(modifier = Modifier.fillMaxWidth().padding(14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(modifier = Modifier.size(46.dp).clip(CircleShape)
-                        .background(Brush.radialGradient(listOf(Color(0xFF1E88E5), Color(0xFF003366))))
+                        .background(Brush.radialGradient(
+                            listOf(Color(0xFF1E88E5), Color(0xFF003366))))
                         .border(2.dp, Color(0xFFEEEEEE), CircleShape),
                         contentAlignment = Alignment.Center) {
                         Text(t1Short.take(3).uppercase(), color = D11White,
@@ -474,7 +584,10 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                         }
                     }
                 }
-                Text("vs", color = Color(0xFF888888), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+
+                Text("vs", color = Color(0xFF888888), fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold)
+
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(horizontalAlignment = Alignment.End) {
@@ -489,7 +602,8 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                         }
                     }
                     Box(modifier = Modifier.size(46.dp).clip(CircleShape)
-                        .background(Brush.radialGradient(listOf(Color(0xFF43A047), Color(0xFF006600))))
+                        .background(Brush.radialGradient(
+                            listOf(Color(0xFF43A047), Color(0xFF006600))))
                         .border(2.dp, Color(0xFFEEEEEE), CircleShape),
                         contentAlignment = Alignment.Center) {
                         Text(t2Short.take(3).uppercase(), color = D11White,
@@ -498,6 +612,7 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                 }
             }
 
+            // STATUS
             if (match.status.isNotEmpty()) {
                 Text(match.status,
                     color = if (isLive) D11Red else Color(0xFF666666),
@@ -508,14 +623,17 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
 
             HorizontalDivider(color = Color(0xFFEEEEEE))
 
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            // PRIZE + BUTTON
+            Row(modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(modifier = Modifier.size(22.dp).clip(CircleShape).background(D11Yellow),
                         contentAlignment = Alignment.Center) {
-                        Text("M", color = D11Black, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("M", color = D11Black, fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold)
                     }
                     Column {
                         Text("Rs.50 Crores +", color = Color(0xFF111111),
@@ -523,29 +641,33 @@ fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
                         Text("Prize Pool", color = Color(0xFF888888), fontSize = 10.sp)
                     }
                 }
-                if (!isCompleted) {
-                    Button(onClick = onClick,
+                when {
+                    isCompleted -> OutlinedButton(onClick = onClick,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp, Color(0xFFCCCCCC)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
+                        Text("View Results", color = Color(0xFF666666), fontSize = 13.sp)
+                    }
+                    else -> Button(onClick = onClick,
                         colors = ButtonDefaults.buttonColors(containerColor = D11Red),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                         elevation = ButtonDefaults.buttonElevation(2.dp)) {
-                        Text("Play", color = D11White, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
-                    }
-                } else {
-                    OutlinedButton(onClick = onClick,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
-                        Text("View", color = Color(0xFF666666), fontSize = 14.sp)
+                        Text("Play", color = D11White, fontWeight = FontWeight.ExtraBold,
+                            fontSize = 14.sp)
                     }
                 }
             }
 
-            Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFEEEEEE))) {
+            // PROGRESS BAR
+            Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                .background(Color(0xFFEEEEEE))) {
                 Box(modifier = Modifier.fillMaxWidth(0.75f).height(4.dp)
                     .background(Brush.horizontalGradient(listOf(D11Green, Color(0xFF00E676)))))
             }
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
+            Row(modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("75% Full", color = Color(0xFF888888), fontSize = 11.sp)
                 Text("50,000 Spots", color = Color(0xFF888888), fontSize = 11.sp)
