@@ -1,3 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">dream11india</string>
+    <string name="app_name">DREAM11</string>
+
+    <string name="nav_home">Home</string>
+    <string name="nav_matches">My Matches</string>
+    <string name="nav_rewards">DreamCoins</string>
+    <string name="nav_games">Games</string>
+
+    <string name="cd_notifications">Notifications</string>
+    <string name="cd_refer">Refer &amp; Earn</string>
+    <string name="cd_add_money">Add Money</string>
+
+    <string name="search_hint">Search matches, teams…</string>
+    <string name="cd_clear_search">Clear search</string>
+
+    <string name="banner_mega_title">MEGA CONTEST</string>
+    <string name="banner_mega_sub">Win Rs.1 Crore!</string>
+    <string name="banner_ipl_title">IPL 2026</string>
+    <string name="banner_ipl_sub">Play Now &amp; Win Big!</string>
+    <string name="banner_free_title">FREE CONTEST</string>
+    <string name="banner_free_sub">No Entry Fee!</string>
+
+    <string name="label_live">LIVE</string>
+    <string name="label_completed">Completed</string>
+    <string name="label_prize_pool">Prize Pool</string>
+    <string name="label_full">Full</string>
+    <string name="label_entry">Entry</string>
+
+    <string name="btn_play">Play</string>
+    <string name="btn_join_now">Join Now</string>
+    <string name="btn_view_results">View Results</string>
+    <string name="btn_refresh">Refresh</string>
+    <string name="btn_admin">Admin Panel</string>
+
+    <string name="empty_title">No matches found</string>
+    <string name="empty_sub">Try a different filter</string>
 </resources>

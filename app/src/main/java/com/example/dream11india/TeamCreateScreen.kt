@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -90,37 +90,32 @@ fun TeamCreateScreen(
 
     // Load real players from API
     LaunchedEffect(matchTitle) {
-        isLoadingPlayers = true
-        try {
-            // Try to get matchId from title
-            val matchId = "95001" // Default IPL match ID
-            val response = CricbuzzApi.service.getMatchCenter(matchId)
+    isLoadingPlayers = true
+    try {
+        val matchId = "95001"
 
-            val realPlayers = mutableListOf<Player>()
-
-            val t1Short = response.team1?.teamSName ?: team1.take(3)
-            val t2Short = response.team2?.teamSName ?: team2.take(3)
-
-            response.team1?.players?.forEach { p ->
-                if (realPlayers.size < 15) {
-                    realPlayers.add(convertToPlayer(p, team1, t1Short))
-                }
-            }
-            response.team2?.players?.forEach { p ->
-                if (realPlayers.size < 22) {
-                    realPlayers.add(convertToPlayer(p, team2, t2Short))
+        when (val response = CricApiRepository.getSquad(matchId)) {
+            is ApiResult.Success -> {
+                if (response.data.isNotEmpty()) {
+                    allPlayers.clear()
+                    allPlayers.addAll(response.data)
                 }
             }
 
-            if (realPlayers.isNotEmpty()) {
-                allPlayers.clear()
-                allPlayers.addAll(realPlayers)
+            is ApiResult.Error -> {
+                apiError = response.message
             }
-        } catch (e: Exception) {
-            apiError = "Using sample players"
+
+            is ApiResult.Loading -> {
+                // no-op
+            }
         }
-        isLoadingPlayers = false
+
+    } catch (e: Exception) {
+        apiError = "Using sample players"
     }
+    isLoadingPlayers = false
+}
     var sortType by remember { mutableStateOf(SortType.POINTS) }
     val listState = rememberLazyListState()
 
@@ -829,3 +824,6 @@ fun CVCSelectionScreen(
         }
     }
 }
+
+
+

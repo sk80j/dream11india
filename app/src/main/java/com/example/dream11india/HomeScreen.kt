@@ -1,10 +1,11 @@
 ﻿package com.example.dream11india
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,419 +13,183 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+private val BannerData = listOf(
+    Triple(R.string.banner_mega_title,    R.string.banner_mega_sub,    D11Red),
+    Triple(R.string.banner_ipl_title,     R.string.banner_ipl_sub,     Color(0xFF1565C0)),
+    Triple(R.string.banner_free_title,    R.string.banner_free_sub,    D11Green)
+)
+private val SportTabs      = listOf("Cricket", "Football", "Kabaddi", "Basketball", "Baseball")
+private val LeagueFilters  = listOf("All", "IPL", "T20", "ODI", "Test")
+private val StatusFilters  = listOf("All", "Live", "Upcoming", "Completed")
+private val BottomNavItems = listOf(
+    NavItem("home",    R.string.nav_home,     Icons.Filled.Home,          Icons.Outlined.Home),
+    NavItem("matches", R.string.nav_matches,  Icons.Filled.Star,  Icons.Outlined.Star),
+    NavItem("rewards", R.string.nav_rewards,  Icons.Filled.EmojiEvents,          Icons.Outlined.EmojiEvents),
+    NavItem("games",   R.string.nav_games,    Icons.Filled.SportsEsports,  Icons.Outlined.SportsEsports)
+)
+
+private data class NavItem(
+    val key:          String,
+    val labelRes:     Int,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
+)
+
+// ─────────────────────────────────────────────
+// ROOT SCREEN
+// ─────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    currentTab: String = "home",
-    userData: UserData = UserData(),
-    onTabChange: (String) -> Unit = {},
-    onMatchClick: (MatchData) -> Unit = {},
-    onWalletClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    onAdminClick: () -> Unit = {},
+    currentTab:      String       = "home",
+    userData:        UserData     = UserData(),
+    homeViewModel:   HomeViewModel = viewModel(),
+    onTabChange:     (String) -> Unit = {},
+    onMatchClick:    (MatchData) -> Unit = {},
+    onWalletClick:   () -> Unit = {},
+    onProfileClick:  () -> Unit = {},
+    onAdminClick:    () -> Unit = {},
     onLeaderboardClick: () -> Unit = {}
 ) {
-    val scope = rememberCoroutineScope()
-    var matches by remember { mutableStateOf<List<CricMatch>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var selectedLeague by remember { mutableStateOf("All") }
-    var selectedFilter by remember { mutableStateOf("All") }
-    var selectedSport by remember { mutableStateOf("Cricket") }
-    var bannerIndex by remember { mutableStateOf(0) }
-    var searchQuery by remember { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val uiState      by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val listState    = rememberLazyListState()
+    val ptrState     = rememberPullToRefreshState()
+    val snackbar     = remember { SnackbarHostState() }
 
-    val banners = listOf(
-        Triple("MEGA CONTEST", "Win Rs.1 Crore!", D11Red),
-        Triple("IPL 2026", "Play Now & Win Big!", Color(0xFF1565C0)),
-        Triple("FREE CONTEST", "No Entry Fee!", D11Green)
-    )
-
-    val sports = listOf("Cricket", "Football", "Kabaddi", "Basketball", "Baseball")
-
-    val sampleMatches = listOf(
-        CricMatch(id="1", name="RR vs MI",
-            status="Rajasthan Royals need 45 runs in 30 balls",
-            venue="Sawai Mansingh Stadium", date="2026-04-14",
-            teams=listOf("Rajasthan Royals","Mumbai Indians"),
-            teamInfo=listOf(TeamInfo("Rajasthan Royals","RR",""),TeamInfo("Mumbai Indians","MI","")),
-            score=listOf(Score(186,5,20.0,"MI"),Score(142,3,14.0,"RR")),
-            matchStarted=true, matchEnded=false),
-        CricMatch(id="2", name="CSK vs RCB", status="Today, 7:30 PM",
-            venue="MA Chidambaram Stadium", date="2026-04-14",
-            teams=listOf("Chennai Super Kings","Royal Challengers"),
-            teamInfo=listOf(TeamInfo("Chennai Super Kings","CSK",""),TeamInfo("Royal Challengers","RCB","")),
-            score=null, matchStarted=false, matchEnded=false),
-        CricMatch(id="3", name="KKR vs DC", status="Tomorrow, 3:30 PM",
-            venue="Eden Gardens", date="2026-04-15",
-            teams=listOf("Kolkata Knight Riders","Delhi Capitals"),
-            teamInfo=listOf(TeamInfo("Kolkata Knight Riders","KKR",""),TeamInfo("Delhi Capitals","DC","")),
-            score=null, matchStarted=false, matchEnded=false),
-        CricMatch(id="4", name="PBKS vs SRH", status="Tomorrow, 7:30 PM",
-            venue="PCA Stadium", date="2026-04-15",
-            teams=listOf("Punjab Kings","Sunrisers Hyderabad"),
-            teamInfo=listOf(TeamInfo("Punjab Kings","PBKS",""),TeamInfo("Sunrisers Hyderabad","SRH","")),
-            score=null, matchStarted=false, matchEnded=false),
-        CricMatch(id="5", name="GT vs LSG", status="15 Apr, 7:30 PM",
-            venue="Narendra Modi Stadium", date="2026-04-15",
-            teams=listOf("Gujarat Titans","Lucknow Super Giants"),
-            teamInfo=listOf(TeamInfo("Gujarat Titans","GT",""),TeamInfo("Lucknow Super Giants","LSG","")),
-            score=null, matchStarted=false, matchEnded=false)
-    )
-
-    fun parseCricbuzzMatches(response: CricbuzzMatchListResponse): List<CricMatch> {
-        val allMatches = mutableListOf<CricMatch>()
-        response.typeMatches?.forEach { typeMatch ->
-            typeMatch.seriesMatches?.forEach { sw ->
-                val wrapper = sw.seriesAdWrapper ?: return@forEach
-                wrapper.matches?.forEach { cbMatch ->
-                    val info = cbMatch.matchInfo ?: return@forEach
-                    allMatches.add(CricMatch(
-                        id = info.matchId.toString(),
-                        name = "${info.team1?.teamSName ?: "T1"} vs ${info.team2?.teamSName ?: "T2"}",
-                        status = info.status ?: "",
-                        venue = "${info.venueInfo?.ground ?: ""}, ${info.venueInfo?.city ?: ""}",
-                        date = info.startDate ?: "",
-                        teams = listOf(info.team1?.teamName ?: "Team 1", info.team2?.teamName ?: "Team 2"),
-                        teamInfo = listOf(
-                            TeamInfo(info.team1?.teamName ?: "", info.team1?.teamSName ?: "", ""),
-                            TeamInfo(info.team2?.teamName ?: "", info.team2?.teamSName ?: "", "")
-                        ),
-                        score = cbMatch.matchScore?.let { ms ->
-                            listOfNotNull(
-                                ms.team1Score?.inngs1?.let { Score(it.runs, it.wickets, it.overs, "1st") },
-                                ms.team2Score?.inngs1?.let { Score(it.runs, it.wickets, it.overs, "2nd") }
-                            )
-                        },
-                        matchStarted = info.state == "In Progress",
-                        matchEnded = info.state == "Complete"
-                    ))
-                }
-            }
-        }
-        return allMatches
+    // Show error in snackbar
+    val errorMsg = (uiState.matchState as? MatchUiState.Error)?.message
+    LaunchedEffect(errorMsg) {
+        if (!errorMsg.isNullOrBlank()) snackbar.showSnackbar(errorMsg)
     }
 
-    fun loadMatches() {
-        scope.launch {
-            try {
-                val allMatches = mutableListOf<CricMatch>()
-                try {
-                    val liveResp = CricbuzzApi.service.getLiveMatches()
-                    allMatches.addAll(parseCricbuzzMatches(liveResp))
-                    val upcomingResp = CricbuzzApi.service.getUpcomingMatches()
-                    allMatches.addAll(parseCricbuzzMatches(upcomingResp))
-                } catch (e: Exception) { }
-                if (allMatches.isEmpty()) allMatches.addAll(sampleMatches)
-                matches = allMatches
-            } catch (e: Exception) {
-                matches = sampleMatches
-            }
-            isLoading = false
-        }
+    // Derived filtered list — only recomputes when relevant state changes
+    val filteredMatches by remember(uiState) {
+        derivedStateOf { homeViewModel.filteredMatches(uiState) }
     }
 
-    LaunchedEffect(Unit) {
-        loadMatches()
-        while (true) {
-            delay(30000)
-            loadMatches()
-        }
-    }
+    Scaffold(
+        snackbarHost    = { SnackbarHost(snackbar) },
+        containerColor  = Color(0xFFF2F3F5)
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(3000)
-            bannerIndex = (bannerIndex + 1) % banners.size
-        }
-    }
-
-    val filteredMatches = remember(matches, selectedLeague, selectedFilter, searchQuery) {
-        var list = matches
-        if (searchQuery.isNotEmpty()) {
-            list = list.filter { it.name.contains(searchQuery, true) ||
-                it.teams.any { t -> t.contains(searchQuery, true) } }
-        }
-        list = when(selectedLeague) {
-            "IPL" -> list.filter { m -> m.teams.any { t ->
-                listOf("Mumbai","Chennai","Royal","Kolkata","Delhi","Punjab",
-                    "Rajasthan","Sunrisers","Gujarat","Lucknow").any { t.contains(it,true) }}}
-            "T20" -> list.filter { it.status.contains("T20",true) }
-            "ODI" -> list.filter { it.status.contains("ODI",true) }
-            "Test" -> list.filter { it.status.contains("Test",true) }
-            else -> list
-        }
-        list = when(selectedFilter) {
-            "Live" -> list.filter { it.matchStarted && !it.matchEnded }
-            "Upcoming" -> list.filter { !it.matchStarted }
-            "Completed" -> list.filter { it.matchEnded }
-            else -> list
-        }
-        list
-    }
-
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
-        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5)).padding(padding)) {
             Column(modifier = Modifier.fillMaxSize()) {
 
-                // TOP BAR
-                Box(modifier = Modifier.fillMaxWidth()
-                    .background(Color(0xFF1A1A1A)).statusBarsPadding()) {
-                    Column {
-                        Row(modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically) {
+                HomeTopBar(
+                    userData        = userData,
+                    selectedSport   = uiState.selectedSport,
+                    onSportSelected = homeViewModel::selectSport,
+                    onProfileClick  = onProfileClick,
+                    onWalletClick   = onWalletClick
+                )
 
-                            // Profile + Logo + Name
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.size(38.dp).clip(CircleShape)
-                                    .background(D11Red).clickable { onProfileClick() },
-                                    contentAlignment = Alignment.Center) {
-                                    Text((userData.name.firstOrNull() ?: "P").toString().uppercase(),
-                                        color = D11White, fontSize = 16.sp,
-                                        fontWeight = FontWeight.ExtraBold)
-                                }
-                                Image(painter = painterResource(id = R.drawable.ic_logo),
-                                    contentDescription = "Logo", modifier = Modifier.size(30.dp))
-                                Text("DREAM11", color = D11White, fontSize = 18.sp,
-                                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                            }
+                PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh    = homeViewModel::refresh,
+                    state        = ptrState,
+                    modifier     = Modifier.weight(1f)
+                ) {
+                    when (val state = uiState.matchState) {
+                        is MatchUiState.Loading -> CardSkeletonList()
 
-                            // Wallet + Icons
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                // Notification
-                                Box(modifier = Modifier.size(32.dp).clip(CircleShape)
-                                    .background(Color(0xFF2A2A2A)),
-                                    contentAlignment = Alignment.Center) {
-                                    Text("N", color = D11White, fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold)
-                                }
-                                // Referral
-                                Box(modifier = Modifier.size(32.dp).clip(CircleShape)
-                                    .background(Color(0xFF2A2A2A)),
-                                    contentAlignment = Alignment.Center) {
-                                    Text("R", color = D11Yellow, fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold)
-                                }
-                                // Wallet
-                                Box(modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                                    .background(Color(0xFF2A2A2A))
-                                    .clickable { onWalletClick() }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Rs.${userData.balance}", color = D11White,
-                                            fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-                                        Box(modifier = Modifier.size(16.dp).clip(CircleShape)
-                                            .background(D11Green),
-                                            contentAlignment = Alignment.Center) {
-                                            Text("+", color = D11White, fontSize = 12.sp,
-                                                fontWeight = FontWeight.ExtraBold)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // SPORT TABS
-                        LazyRow(modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            items(sports) { sport ->
-                                val isSelected = selectedSport == sport
-                                Column(modifier = Modifier.clickable { selectedSport = sport }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(sport,
-                                        color = if (isSelected) D11White else D11Gray,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.ExtraBold
-                                        else FontWeight.Normal)
-                                    if (isSelected) {
-                                        Spacer(modifier = Modifier.height(3.dp))
-                                        Box(modifier = Modifier.width(30.dp).height(2.dp)
-                                            .background(D11Red))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                when {
-                    isLoading -> ShimmerLoadingUI()
-                    else -> {
-                        LazyColumn(state = listState, modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(bottom = 80.dp)) {
-
-                            // SEARCH BAR
-                            item {
-                                Row(modifier = Modifier.fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(D11White)
-                                    .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("S", color = D11Gray, fontSize = 14.sp)
-                                    androidx.compose.foundation.text.BasicTextField(
-                                        value = searchQuery,
-                                        onValueChange = { searchQuery = it },
-                                        modifier = Modifier.weight(1f),
-                                        textStyle = androidx.compose.ui.text.TextStyle(
-                                            color = Color(0xFF333333), fontSize = 14.sp),
-                                        decorationBox = { inner ->
-                                            if (searchQuery.isEmpty()) {
-                                                Text("Search matches...", color = D11Gray,
-                                                    fontSize = 14.sp)
-                                            }
-                                            inner()
-                                        }
+                        is MatchUiState.Error,
+                        is MatchUiState.Success -> {
+                            LazyColumn(
+                                state          = listState,
+                                contentPadding = PaddingValues(bottom = 80.dp)
+                            ) {
+                                item(key = "search") {
+                                    SearchSection(
+                                        query    = uiState.searchQuery,
+                                        onChange = homeViewModel::updateSearch,
+                                        onClear  = homeViewModel::clearSearch
                                     )
-                                    if (searchQuery.isNotEmpty()) {
-                                        Text("X", color = D11Gray, fontSize = 14.sp,
-                                            modifier = Modifier.clickable { searchQuery = "" })
-                                    }
                                 }
-                            }
 
-                            // BANNER
-                            item {
-                                Box(modifier = Modifier.fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(banners[bannerIndex].third).height(90.dp),
-                                    contentAlignment = Alignment.Center) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(banners[bannerIndex].first, color = D11White,
-                                            fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                                        Text(banners[bannerIndex].second,
-                                            color = Color(0xCCFFFFFF), fontSize = 13.sp)
-                                    }
-                                    Row(modifier = Modifier.align(Alignment.BottomCenter)
-                                        .padding(bottom = 8.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        banners.indices.forEach { i ->
-                                            Box(modifier = Modifier
-                                                .size(if (i == bannerIndex) 20.dp else 6.dp, 6.dp)
-                                                .clip(RoundedCornerShape(3.dp))
-                                                .background(
-                                                    if (i == bannerIndex) D11White
-                                                    else Color(0x66FFFFFF)))
-                                        }
-                                    }
+                                item(key = "banner") {
+                                    BannerCarousel(
+                                        banners      = BannerData,
+                                        currentIndex = uiState.bannerIndex
+                                    )
                                 }
-                            }
 
-                            // LEAGUE FILTER
-                            item {
-                                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(listOf("All","IPL","T20","ODI","Test")) { league ->
-                                        Box(modifier = Modifier
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(if (selectedLeague == league) D11Red else D11White)
-                                            .border(1.dp,
-                                                if (selectedLeague == league) D11Red
-                                                else Color(0xFFDDDDDD),
-                                                RoundedCornerShape(20.dp))
-                                            .clickable { selectedLeague = league }
-                                            .padding(horizontal = 18.dp, vertical = 8.dp)) {
-                                            Text(league,
-                                                color = if (selectedLeague == league) D11White
-                                                else Color(0xFF333333),
-                                                fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
+                                item(key = "leagueChips") {
+                                    FilterChips(
+                                        items    = LeagueFilters,
+                                        selected = uiState.selectedLeague,
+                                        onSelect = homeViewModel::selectLeague,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
                                 }
-                            }
 
-                            // STATUS FILTER
-                            item {
-                                Row(modifier = Modifier.fillMaxWidth().background(D11White)
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    listOf("All","Live","Upcoming","Completed").forEach { filter ->
-                                        val isSelected = selectedFilter == filter
-                                        Column(modifier = Modifier.clickable { selectedFilter = filter },
-                                            horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(filter,
-                                                color = if (isSelected) D11Red else Color(0xFF666666),
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.ExtraBold
-                                                else FontWeight.Normal)
-                                            if (isSelected) {
-                                                Spacer(modifier = Modifier.height(3.dp))
-                                                Box(modifier = Modifier.width(30.dp).height(2.dp)
-                                                    .background(D11Red))
-                                            }
-                                        }
-                                    }
+                                item(key = "statusTabs") {
+                                    StatusFilterTabs(
+                                        selected = uiState.selectedFilter,
+                                        onSelect = homeViewModel::selectFilter
+                                    )
                                 }
-                                HorizontalDivider(color = Color(0xFFEEEEEE))
-                            }
 
-                            // MATCHES
-                            if (filteredMatches.isEmpty()) {
-                                item {
-                                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp),
-                                        contentAlignment = Alignment.Center) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text("No matches found",
-                                                color = Color(0xFF888888), fontSize = 16.sp,
-                                                fontWeight = FontWeight.Bold)
-                                            Text("Try a different filter",
-                                                color = Color(0xFFAAAAAA), fontSize = 13.sp)
-                                            Button(onClick = { loadMatches() },
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = D11Red),
-                                                shape = RoundedCornerShape(8.dp)) {
-                                                Text("Refresh", color = D11White,
-                                                    fontWeight = FontWeight.Bold)
-                                            }
-                                        }
+                                if (filteredMatches.isEmpty()) {
+                                    item(key = "empty") {
+                                        EmptyState(onRefresh = homeViewModel::refresh)
                                     }
-                                }
-                            } else {
-                                items(filteredMatches, key = { it.id }) { match ->
-                                    Dream11MatchCard(match = match,
-                                        onClick = { onMatchClick(matchDataFromCric(match)) })
-                                }
+                                } else {
+                                    items(filteredMatches, key = { it.id }) { match ->
+                                        MatchCard(
+                                            match   = match,
+                                            onClick = {
+                                val t1 = match.teamInfo?.getOrNull(0)?.shortname?.ifEmpty { match.teams.getOrElse(0){"T1"}.take(3) } ?: match.teams.getOrElse(0){"T1"}.take(3)
+                                val t2 = match.teamInfo?.getOrNull(1)?.shortname?.ifEmpty { match.teams.getOrElse(1){"T2"}.take(3) } ?: match.teams.getOrElse(1){"T2"}.take(3)
+                                onMatchClick(MatchData(
+                                    id=match.id, team1=t1.uppercase(), team2=t2.uppercase(),
+                                    team1Full=match.teams.getOrElse(0){"Team 1"}, team2Full=match.teams.getOrElse(1){"Team 2"},
+                                    team1Logo=match.t1LogoUrl, team2Logo=match.t2LogoUrl,
+                                    type="T20", league="IPL 2026", matchTime=match.date,
+                                    hoursLeft=2, minutesLeft=30, prize=match.prizePool,
+                                    spots=match.totalSpots, fillPercent=match.filledSpots,
+                                    badge=match.badge, team1Color=androidx.compose.ui.graphics.Color(0xFF003366),
+                                    team2Color=androidx.compose.ui.graphics.Color(0xFF006600)
+                                ))
                             }
-
-                            if (userData.isAdmin) {
-                                item {
-                                    Button(onClick = onAdminClick,
-                                        modifier = Modifier.fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color(0xFF333333)),
-                                        shape = RoundedCornerShape(8.dp)) {
-                                        Text("Admin Panel", color = D11White,
-                                            fontWeight = FontWeight.Bold)
+                                        )
                                     }
+                                }
+
+                                if (userData.isAdmin) {
+                                    item(key = "admin") { AdminButton(onClick = onAdminClick) }
                                 }
                             }
                         }
@@ -432,46 +197,113 @@ fun HomeScreen(
                 }
             }
 
-            // BOTTOM NAV
-            Box(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter)
-                .background(D11White)) {
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf(
-                        Triple("home","Home",0),
-                        Triple("matches","My Matches",1),
-                        Triple("rewards","DreamCoins",2),
-                        Triple("refer","Games",3)
-                    ).forEach { (tab, label, index) ->
-                        val isSelected = currentTab == tab
-                        Column(horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clickable { onTabChange(tab) }
-                                .padding(horizontal = 12.dp)) {
-                            Box(modifier = Modifier.size(30.dp).clip(CircleShape)
-                                .background(if (isSelected) D11Red else Color(0xFFF0F0F0)),
-                                contentAlignment = Alignment.Center) {
-                                when(index) {
-                                    0 -> Image(painter = painterResource(id = R.drawable.ic_logo),
-                                        contentDescription = null, modifier = Modifier.size(22.dp))
-                                    1 -> Text("M",
-                                        color = if (isSelected) D11White else Color(0xFF666666),
-                                        fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    2 -> Text("D",
-                                        color = if (isSelected) D11White else Color(0xFF666666),
-                                        fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                    3 -> Text("G",
-                                        color = if (isSelected) D11White else Color(0xFF666666),
-                                        fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(label, color = if (isSelected) D11Red else Color(0xFF888888),
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.ExtraBold
-                                else FontWeight.Normal)
+            BottomNav(
+                currentTab  = currentTab,
+                onTabChange = onTabChange,
+                modifier    = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// HOME TOP BAR
+// ─────────────────────────────────────────────
+@Composable
+fun HomeTopBar(
+    userData:        UserData,
+    selectedSport:   String,
+    onSportSelected: (String) -> Unit,
+    onProfileClick:  () -> Unit,
+    onWalletClick:   () -> Unit
+) {
+    Surface(color = Color(0xFF111111), shadowElevation = 8.dp) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                // Avatar + Logo + Name
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(D11Red, Color(0xFFB71C1C))))
+                            .clickable { onProfileClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text       = (userData.name.firstOrNull() ?: 'P').toString().uppercase(),
+                            color      = D11White,
+                            fontSize   = 15.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    Text(
+                        text          = stringResource(R.string.app_name),
+                        color         = D11White,
+                        fontSize      = 20.sp,
+                        fontWeight    = FontWeight.ExtraBold,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                // Icons row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    TopBarIconButton(
+                        icon             = Icons.Outlined.Notifications,
+                        contentDesc      = stringResource(R.string.cd_notifications),
+                        tint             = D11White,
+                        onClick          = {}
+                    )
+                    TopBarIconButton(
+                        icon             = Icons.Filled.CardGiftcard,
+                        contentDesc      = stringResource(R.string.cd_refer),
+                        tint             = D11Yellow,
+                        onClick          = {}
+                    )
+                    // Wallet chip
+                    Surface(
+                        shape    = RoundedCornerShape(20.dp),
+                        color    = Color(0xFF2A2A2A),
+                        modifier = Modifier.clickable { onWalletClick() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.AccountBalanceWallet, null,
+                                tint = D11Green, modifier = Modifier.size(14.dp))
+                            Text("₹${userData.balance}", color = D11White,
+                                fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                            Icon(Icons.Filled.AddCircle, stringResource(R.string.cd_add_money),
+                                tint = D11Green, modifier = Modifier.size(16.dp))
                         }
                     }
+                }
+            }
+
+            // Sport tabs
+            LazyRow(
+                contentPadding        = PaddingValues(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier              = Modifier.padding(bottom = 4.dp)
+            ) {
+                items(SportTabs) { sport ->
+                    SportTab(label = sport, isSelected = sport == selectedSport,
+                        onClick = { onSportSelected(sport) })
                 }
             }
         }
@@ -479,200 +311,699 @@ fun HomeScreen(
 }
 
 @Composable
-fun ShimmerLoadingUI() {
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val alpha = infiniteTransition.animateFloat(0.3f, 1f,
-        infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "a")
-    LazyColumn(contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(4) {
-            Box(modifier = Modifier.fillMaxWidth().height(160.dp)
-                .clip(RoundedCornerShape(12.dp)).alpha(alpha.value)
-                .background(Color(0xFFDDDDDD)))
+private fun TopBarIconButton(
+    icon: ImageVector, contentDesc: String,
+    tint: Color, onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF2A2A2A))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDesc, tint = tint, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun SportTab(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clickable(indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(label,
+            color = if (isSelected) D11White else Color(0xFF888888),
+            fontSize = 13.sp,
+            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal)
+        if (isSelected) {
+            Spacer(Modifier.height(3.dp))
+            Box(Modifier.width(28.dp).height(2.dp).clip(CircleShape).background(D11Red))
         }
     }
 }
 
-fun matchDataFromCric(match: CricMatch): MatchData {
-    val team1 = match.teams.getOrElse(0) { "Team 1" }.trim()
-    val team2 = match.teams.getOrElse(1) { "Team 2" }.trim()
-    val t1Short = match.teamInfo?.getOrNull(0)?.shortname?.ifEmpty { team1.take(3) } ?: team1.take(3)
-    val t2Short = match.teamInfo?.getOrNull(1)?.shortname?.ifEmpty { team2.take(3) } ?: team2.take(3)
-    return MatchData(
-        id = match.id,
-        team1 = t1Short.uppercase(),
-        team2 = t2Short.uppercase(),
-        team1Full = team1, team2Full = team2,
-        team1Logo = match.teamInfo?.getOrNull(0)?.img ?: "",
-        team2Logo = match.teamInfo?.getOrNull(1)?.img ?: "",
-        type = "T20", league = "IPL 2026",
-        matchTime = match.date, hoursLeft = 2, minutesLeft = 30,
-        prize = "Rs.50 Crores", spots = "50,000",
-        fillPercent = 75, badge = "MEGA",
-        team1Color = Color(0xFF003366), team2Color = Color(0xFF006600)
-    )
+// ─────────────────────────────────────────────
+// SEARCH SECTION
+// ─────────────────────────────────────────────
+@Composable
+fun SearchSection(
+    query: String, onChange: (String) -> Unit,
+    onClear: () -> Unit, modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier        = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        shape           = RoundedCornerShape(12.dp),
+        color           = D11White,
+        shadowElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(Icons.Filled.Search, null, tint = Color(0xFFAAAAAA),
+                modifier = Modifier.size(20.dp))
+            BasicTextField(
+                value = query, onValueChange = onChange,
+                modifier  = Modifier.weight(1f),
+                textStyle = TextStyle(color = Color(0xFF111111), fontSize = 14.sp),
+                singleLine = true,
+                decorationBox = { inner ->
+                    if (query.isEmpty()) Text(stringResource(R.string.search_hint),
+                        color = Color(0xFFBBBBBB), fontSize = 14.sp)
+                    inner()
+                }
+            )
+            AnimatedVisibility(visible = query.isNotEmpty()) {
+                Icon(Icons.Filled.Close, stringResource(R.string.cd_clear_search),
+                    tint = Color(0xFFAAAAAA),
+                    modifier = Modifier.size(18.dp).clickable { onClear() })
+            }
+        }
+    }
 }
 
+// ─────────────────────────────────────────────
+// BANNER CAROUSEL
+// ─────────────────────────────────────────────
 @Composable
-fun Dream11MatchCard(match: CricMatch, onClick: () -> Unit) {
-    val t1Short = match.teamInfo?.getOrNull(0)?.shortname?.ifEmpty {
-        match.teams.getOrElse(0){"T1"}.take(3) } ?: match.teams.getOrElse(0){"T1"}.take(3)
-    val t2Short = match.teamInfo?.getOrNull(1)?.shortname?.ifEmpty {
-        match.teams.getOrElse(1){"T2"}.take(3) } ?: match.teams.getOrElse(1){"T2"}.take(3)
+fun BannerCarousel(
+    banners: List<Triple<Int, Int, Color>>,
+    currentIndex: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .shadow(6.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(banners[currentIndex].third,
+                        banners[currentIndex].third.copy(alpha = 0.7f))
+                )
+            )
+            .height(96.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Decorative circle
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = 30.dp)
+                .size(130.dp)
+                .background(Color.White.copy(alpha = 0.07f), CircleShape)
+        )
+
+        AnimatedContent(
+            targetState = currentIndex,
+            transitionSpec = {
+                (slideInHorizontally { it } + fadeIn()) togetherWith
+                        (slideOutHorizontally { -it } + fadeOut())
+            },
+            label = "banner_content"
+        ) { idx ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(banners[idx].first),
+                    color = D11White, fontSize = 19.sp,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(banners[idx].second),
+                    color = Color(0xDDFFFFFF), fontSize = 13.sp)
+            }
+        }
+
+        // Dot indicators
+        Row(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            banners.indices.forEach { i ->
+                Box(
+                    modifier = Modifier
+                        .size(if (i == currentIndex) 22.dp else 6.dp, 5.dp)
+                        .clip(CircleShape)
+                        .background(if (i == currentIndex) D11White else Color(0x55FFFFFF))
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// FILTER CHIPS (league)
+// ─────────────────────────────────────────────
+@Composable
+fun FilterChips(
+    items: List<String>, selected: String,
+    onSelect: (String) -> Unit, modifier: Modifier = Modifier
+) {
+    LazyRow(
+        contentPadding        = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier              = modifier
+    ) {
+        items(items) { item ->
+            val isSelected = item == selected
+            Surface(
+                shape           = RoundedCornerShape(20.dp),
+                color           = if (isSelected) D11Red else D11White,
+                shadowElevation = if (isSelected) 3.dp else 1.dp,
+                modifier        = Modifier
+                    .clickable { onSelect(item) }
+                    .then(if (!isSelected) Modifier.border(
+                        1.dp, Color(0xFFDDDDDD), RoundedCornerShape(20.dp)) else Modifier)
+            ) {
+                Text(item,
+                    color = if (isSelected) D11White else Color(0xFF444444),
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// STATUS FILTER TABS
+// ─────────────────────────────────────────────
+@Composable
+fun StatusFilterTabs(selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    Surface(color = D11White, modifier = modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                StatusFilters.forEach { filter ->
+                    val isSel = filter == selected
+                    Column(
+                        modifier = Modifier.clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
+                            onClick = { onSelect(filter) }),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(filter,
+                            color = if (isSel) D11Red else Color(0xFF777777),
+                            fontSize = 13.sp,
+                            fontWeight = if (isSel) FontWeight.ExtraBold else FontWeight.Normal)
+                        Spacer(Modifier.height(4.dp))
+                        AnimatedVisibility(visible = isSel) {
+                            Box(Modifier.width(30.dp).height(2.dp)
+                                .clip(CircleShape).background(D11Red))
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = Color(0xFFEEEEEE))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// MATCH CARD  (fully dynamic data)
+// ─────────────────────────────────────────────
+@Composable
+fun MatchCard(match: CricMatch, onClick: () -> Unit) {
+    val t1Info    = match.teamInfo?.getOrNull(0)
+    val t2Info    = match.teamInfo?.getOrNull(1)
+    val t1Short   = t1Info?.shortname?.ifEmpty { match.teams.getOrElse(0){"T1"}.take(3) }
+        ?: match.teams.getOrElse(0){"T1"}.take(3)
+    val t2Short   = t2Info?.shortname?.ifEmpty { match.teams.getOrElse(1){"T2"}.take(3) }
+        ?: match.teams.getOrElse(1){"T2"}.take(3)
     val team1Full = match.teams.getOrElse(0) { t1Short }
     val team2Full = match.teams.getOrElse(1) { t2Short }
-    val isLive = match.matchStarted && !match.matchEnded
+    val isLive      = match.matchStarted && !match.matchEnded
     val isCompleted = match.matchEnded
 
-    // Blinking animation for LIVE
-    val infiniteTransition = rememberInfiniteTransition(label = "live")
-    val liveDotAlpha = infiniteTransition.animateFloat(0.3f, 1f,
-        infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "dot")
+    val infiniteTransition = rememberInfiniteTransition(label = "live_${match.id}")
+    val liveDotAlpha by infiniteTransition.animateFloat(0.25f, 1f,
+        infiniteRepeatable(tween(650), RepeatMode.Reverse), label = "dot_${match.id}")
 
-    Card(modifier = Modifier.fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 6.dp).clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = D11White),
-        shape = RoundedCornerShape(14.dp),
+    // Badge color
+    val badgeColor = when (match.badge) {
+        "FREE"        -> D11Green
+        "GUARANTEED"  -> Color(0xFF7B1FA2)
+        else          -> D11Red   // MEGA
+    }
+
+    Card(
+        modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+            .clickable(onClick = onClick),
+        colors    = CardDefaults.cardColors(containerColor = D11White),
+        shape     = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(3.dp),
-        border = if (isLive) androidx.compose.foundation.BorderStroke(
-            1.dp, Color(0xFFFFCDD2)) else null) {
+        border    = if (isLive)
+            androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFCDD2)) else null
+    ) {
         Column {
-            // HEADER
-            Row(modifier = Modifier.fillMaxWidth()
-                .background(if (isLive) Color(0xFFFFF3F3) else Color(0xFFF8F8F8))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+            // ── HEADER ──
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(if (isLive) Color(0xFFFFF5F5) else Color(0xFFF7F8FA))
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Text("T20 - IPL 2026", color = Color(0xFF444444),
-                    fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Filled.EmojiEvents, null, tint = D11Yellow,
+                        modifier = Modifier.size(14.dp))
+                    Text("T20 · IPL 2026", color = Color(0xFF555555),
+                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
                 when {
                     isLive -> Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(7.dp).clip(CircleShape)
-                            .alpha(liveDotAlpha.value).background(D11Red))
-                        Text("LIVE", color = D11Red, fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Box(Modifier.size(7.dp).clip(CircleShape)
+                            .alpha(liveDotAlpha).background(D11Red))
+                        Text(stringResource(R.string.label_live), color = D11Red,
+                            fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
-                    isCompleted -> Text("Completed", color = Color(0xFF888888), fontSize = 12.sp)
+                    isCompleted -> Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF888888),
+                            modifier = Modifier.size(13.dp))
+                        Text(stringResource(R.string.label_completed),
+                            color = Color(0xFF888888), fontSize = 12.sp)
+                    }
                     else -> CountdownTimer(hoursLeft = 2, minutesLeft = 30)
                 }
             }
 
-            // TEAMS
-            Row(modifier = Modifier.fillMaxWidth().padding(14.dp),
+            // ── TEAMS ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(modifier = Modifier.size(46.dp).clip(CircleShape)
-                        .background(Brush.radialGradient(
-                            listOf(Color(0xFF1E88E5), Color(0xFF003366))))
-                        .border(2.dp, Color(0xFFEEEEEE), CircleShape),
-                        contentAlignment = Alignment.Center) {
-                        Text(t1Short.take(3).uppercase(), color = D11White,
-                            fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                    }
-                    Column {
-                        Text(t1Short.uppercase(), color = Color(0xFF111111),
-                            fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                        Text(team1Full.take(16), color = Color(0xFF888888), fontSize = 11.sp)
-                        if (isLive) {
-                            match.score?.getOrNull(0)?.let { s ->
-                                Text("${s.r}/${s.w} (${s.o})", color = Color(0xFF111111),
-                                    fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                // Team 1
+                TeamBlock(
+                    shortName = t1Short,
+                    fullName  = team1Full,
+                    logoUrl   = match.t1LogoUrl,
+                    score     = if (isLive) match.score?.getOrNull(0) else null,
+                    gradient  = Brush.radialGradient(listOf(Color(0xFF1E88E5), Color(0xFF003366))),
+                    rtl       = false
+                )
+
+                // VS badge
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape)
+                        .background(Color(0xFFF0F0F0)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("vs", color = Color(0xFF999999),
+                        fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                 }
 
-                Text("vs", color = Color(0xFF888888), fontSize = 14.sp,
-                    fontWeight = FontWeight.ExtraBold)
-
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(t2Short.uppercase(), color = Color(0xFF111111),
-                            fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                        Text(team2Full.take(16), color = Color(0xFF888888), fontSize = 11.sp)
-                        if (isLive) {
-                            match.score?.getOrNull(1)?.let { s ->
-                                Text("${s.r}/${s.w} (${s.o})", color = Color(0xFF111111),
-                                    fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                    Box(modifier = Modifier.size(46.dp).clip(CircleShape)
-                        .background(Brush.radialGradient(
-                            listOf(Color(0xFF43A047), Color(0xFF006600))))
-                        .border(2.dp, Color(0xFFEEEEEE), CircleShape),
-                        contentAlignment = Alignment.Center) {
-                        Text(t2Short.take(3).uppercase(), color = D11White,
-                            fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                    }
-                }
+                // Team 2
+                TeamBlock(
+                    shortName = t2Short,
+                    fullName  = team2Full,
+                    logoUrl   = match.t2LogoUrl,
+                    score     = if (isLive) match.score?.getOrNull(1) else null,
+                    gradient  = Brush.radialGradient(listOf(Color(0xFF43A047), Color(0xFF006600))),
+                    rtl       = true
+                )
             }
 
-            // STATUS
+            // ── STATUS TEXT ──
             if (match.status.isNotEmpty()) {
                 Text(match.status,
-                    color = if (isLive) D11Red else Color(0xFF666666),
+                    color = if (isLive) D11Red else Color(0xFF777777),
                     fontSize = 11.sp,
                     fontWeight = if (isLive) FontWeight.Bold else FontWeight.Normal,
-                    modifier = Modifier.padding(horizontal = 14.dp).padding(bottom = 6.dp))
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 10.dp))
             }
 
-            HorizontalDivider(color = Color(0xFFEEEEEE))
+            HorizontalDivider(color = Color(0xFFF0F0F0))
 
-            // PRIZE + BUTTON
-            Row(modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+            // ── PRIZE + BADGE + CTA ──
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(modifier = Modifier.size(22.dp).clip(CircleShape).background(D11Yellow),
-                        contentAlignment = Alignment.Center) {
-                        Text("M", color = D11Black, fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold)
+                    // Badge pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(badgeColor.copy(alpha = 0.12f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Text(match.badge, color = badgeColor,
+                            fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                     }
                     Column {
-                        Text("Rs.50 Crores +", color = Color(0xFF111111),
+                        Text(match.prizePool, color = Color(0xFF111111),
                             fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("Prize Pool", color = Color(0xFF888888), fontSize = 10.sp)
+                        Text(stringResource(R.string.label_prize_pool),
+                            color = Color(0xFF999999), fontSize = 10.sp)
                     }
                 }
+
                 when {
                     isCompleted -> OutlinedButton(onClick = onClick,
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp, Color(0xFFCCCCCC)),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
-                        Text("View Results", color = Color(0xFF666666), fontSize = 13.sp)
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCCCCC)),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 9.dp)) {
+                        Text(stringResource(R.string.btn_view_results),
+                            color = Color(0xFF666666), fontSize = 13.sp)
                     }
                     else -> Button(onClick = onClick,
                         colors = ButtonDefaults.buttonColors(containerColor = D11Red),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                        elevation = ButtonDefaults.buttonElevation(2.dp)) {
-                        Text("Play", color = D11White, fontWeight = FontWeight.ExtraBold,
-                            fontSize = 14.sp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 22.dp, vertical = 9.dp),
+                        elevation = ButtonDefaults.buttonElevation(3.dp)) {
+                        Text(if (isLive) stringResource(R.string.btn_join_now)
+                        else stringResource(R.string.btn_play),
+                            color = D11White, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                     }
                 }
             }
 
-            // PROGRESS BAR
-            Box(modifier = Modifier.fillMaxWidth().height(4.dp)
-                .background(Color(0xFFEEEEEE))) {
-                Box(modifier = Modifier.fillMaxWidth(0.75f).height(4.dp)
-                    .background(Brush.horizontalGradient(listOf(D11Green, Color(0xFF00E676)))))
+            // ── FILL PROGRESS — DYNAMIC ──
+            val fillFraction = match.filledSpots / 100f
+            val fillColor = when {
+                fillFraction > 0.85f -> Color(0xFFE53935)
+                fillFraction > 0.60f -> D11Yellow
+                else                 -> D11Green
             }
-            Row(modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("75% Full", color = Color(0xFF888888), fontSize = 11.sp)
-                Text("50,000 Spots", color = Color(0xFF888888), fontSize = 11.sp)
+            Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFEEEEEE))) {
+                Box(modifier = Modifier.fillMaxWidth(fillFraction).height(4.dp)
+                    .background(Brush.horizontalGradient(listOf(fillColor, fillColor.copy(alpha=0.7f)))))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("${match.filledSpots}% ${stringResource(R.string.label_full)}",
+                    color = Color(0xFF999999), fontSize = 11.sp)
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Icon(Icons.Filled.Group, null, tint = Color(0xFFBBBBBB),
+                        modifier = Modifier.size(12.dp))
+                    Text(match.totalSpots, color = Color(0xFF999999), fontSize = 11.sp)
+                }
+            }
+
+            // ── ENTRY FEE ──
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(Color(0xFFF7F8FA))
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(Icons.Filled.ConfirmationNumber, null, tint = Color(0xFF999999),
+                    modifier = Modifier.size(12.dp))
+                Text("${stringResource(R.string.label_entry)}: ${match.entryFee}",
+                    color = Color(0xFF777777), fontSize = 11.sp)
             }
         }
     }
 }
+
+// ─────────────────────────────────────────────
+// TEAM BLOCK — Coil logo with initials fallback
+// ─────────────────────────────────────────────
+@Composable
+private fun TeamBlock(
+    shortName: String, fullName: String,
+    logoUrl: String, score: Score?,
+    gradient: Brush, rtl: Boolean
+) {
+    Row(
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (!rtl) {
+            TeamLogo(shortName = shortName, logoUrl = logoUrl, gradient = gradient)
+            TeamTextBlock(shortName = shortName, fullName = fullName,
+                score = score, alignment = Alignment.Start)
+        } else {
+            TeamTextBlock(shortName = shortName, fullName = fullName,
+                score = score, alignment = Alignment.End)
+            TeamLogo(shortName = shortName, logoUrl = logoUrl, gradient = gradient)
+        }
+    }
+}
+
+@Composable
+private fun TeamLogo(shortName: String, logoUrl: String, gradient: Brush, size: Dp = 48.dp) {
+    Box(
+        modifier = Modifier.size(size).clip(CircleShape)
+            .background(gradient)
+            .border(2.dp, Color(0xFFEEEEEE), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (logoUrl.isNotBlank()) {
+            SubcomposeAsyncImage(
+                model             = logoUrl,
+                contentDescription = shortName,
+                contentScale      = ContentScale.Crop,
+                modifier          = Modifier.fillMaxSize().clip(CircleShape),
+                loading           = {
+                    // Show initials while loading
+                    Text(shortName.take(3).uppercase(), color = D11White,
+                        fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                },
+                error = {
+                    // Fallback to initials on error
+                    Text(shortName.take(3).uppercase(), color = D11White,
+                        fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                }
+            )
+        } else {
+            Text(shortName.take(3).uppercase(), color = D11White,
+                fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
+private fun TeamTextBlock(
+    shortName: String, fullName: String,
+    score: Score?, alignment: Alignment.Horizontal
+) {
+    Column(horizontalAlignment = alignment) {
+        Text(shortName.uppercase(), color = Color(0xFF111111),
+            fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+        Text(fullName.take(18), color = Color(0xFF999999),
+            fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        score?.let { s ->
+            Text("${s.r}/${s.w} (${s.o})", color = Color(0xFF111111),
+                fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// BOTTOM NAV
+// ─────────────────────────────────────────────
+@Composable
+fun BottomNav(currentTab: String, onTabChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    Surface(color = D11White, shadowElevation = 16.dp, modifier = modifier.fillMaxWidth()) {
+        Column {
+            HorizontalDivider(color = Color(0xFFEEEEEE))
+            Row(
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                BottomNavItems.forEach { item ->
+                    val isSelected = currentTab == item.key
+                    Column(
+                        modifier = Modifier
+                            .clickable(indication = null,
+                                interactionSource = remember { MutableInteractionSource() },
+                                onClick = { onTabChange(item.key) })
+                            .padding(horizontal = 14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier.size(32.dp).clip(CircleShape)
+                                .background(if (isSelected) D11Red.copy(alpha = 0.12f) else Color.Transparent),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                contentDescription = stringResource(item.labelRes),
+                                tint = if (isSelected) D11Red else Color(0xFF888888),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text(stringResource(item.labelRes),
+                            color = if (isSelected) D11Red else Color(0xFF999999),
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
+                            textAlign = TextAlign.Center)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// CARD SKELETON SHIMMER  (matches real card shape)
+// ─────────────────────────────────────────────
+@Composable
+fun CardSkeletonList() {
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val shimmerX by transition.animateFloat(
+        initialValue  = -300f,
+        targetValue   = 1000f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
+        label         = "shimmerX"
+    )
+    val shimmerBrush = Brush.horizontalGradient(
+        colors = listOf(Color(0xFFE0E0E0), Color(0xFFF5F5F5), Color(0xFFE0E0E0)),
+        startX = shimmerX,
+        endX   = shimmerX + 600f
+    )
+
+    LazyColumn(
+        contentPadding      = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        userScrollEnabled   = false
+    ) {
+        items(3) {
+            Card(
+                shape     = RoundedCornerShape(16.dp),
+                colors    = CardDefaults.cardColors(containerColor = D11White),
+                elevation = CardDefaults.cardElevation(3.dp),
+                modifier  = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    // Header skeleton
+                    Box(Modifier.fillMaxWidth().height(36.dp).background(shimmerBrush))
+                    Spacer(Modifier.height(1.dp))
+
+                    // Teams skeleton
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        // Team 1
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(48.dp).clip(CircleShape).background(shimmerBrush))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(Modifier.width(48.dp).height(16.dp)
+                                    .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                                Box(Modifier.width(80.dp).height(11.dp)
+                                    .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                            }
+                        }
+                        // VS
+                        Box(Modifier.size(36.dp).clip(CircleShape).background(shimmerBrush))
+                        // Team 2
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Column(horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(Modifier.width(48.dp).height(16.dp)
+                                    .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                                Box(Modifier.width(80.dp).height(11.dp)
+                                    .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                            }
+                            Box(Modifier.size(48.dp).clip(CircleShape).background(shimmerBrush))
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFFF0F0F0))
+
+                    // Prize + button skeleton
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Box(Modifier.width(100.dp).height(14.dp)
+                                .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                            Box(Modifier.width(60.dp).height(10.dp)
+                                .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                        }
+                        Box(Modifier.width(80.dp).height(36.dp)
+                            .clip(RoundedCornerShape(10.dp)).background(shimmerBrush))
+                    }
+
+                    // Progress skeleton
+                    Box(Modifier.fillMaxWidth().height(4.dp).background(shimmerBrush))
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Box(Modifier.width(60.dp).height(10.dp)
+                            .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                        Box(Modifier.width(80.dp).height(10.dp)
+                            .clip(RoundedCornerShape(4.dp)).background(shimmerBrush))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// EMPTY STATE
+// ─────────────────────────────────────────────
+@Composable
+private fun EmptyState(onRefresh: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(Icons.Filled.SearchOff, null, tint = Color(0xFFCCCCCC),
+            modifier = Modifier.size(52.dp))
+        Text(stringResource(R.string.empty_title), color = Color(0xFF888888),
+            fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.empty_sub), color = Color(0xFFBBBBBB), fontSize = 13.sp)
+        Spacer(Modifier.height(4.dp))
+        Button(onClick = onRefresh,
+            colors = ButtonDefaults.buttonColors(containerColor = D11Red),
+            shape = RoundedCornerShape(10.dp)) {
+            Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.btn_refresh), color = D11White, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────
+// ADMIN BUTTON
+// ─────────────────────────────────────────────
+@Composable
+private fun AdminButton(onClick: () -> Unit) {
+    Button(
+        onClick  = onClick,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF212121)),
+        shape    = RoundedCornerShape(10.dp)
+    ) {
+        Icon(Icons.Filled.AdminPanelSettings, null, tint = D11White,
+            modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.btn_admin), color = D11White, fontWeight = FontWeight.Bold)
+    }
+}
+
+
 
