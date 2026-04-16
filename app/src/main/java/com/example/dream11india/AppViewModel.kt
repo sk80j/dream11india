@@ -49,7 +49,7 @@ data class AppConfig(
 // WALLET STATE
 // ─────────────────────────────────────────────
 
-data class WalletState(
+data class AppWalletState(
     val balance:     Int = 0,
     val winnings:    Int = 0,
     val bonusCash:   Int = 0,
@@ -90,8 +90,8 @@ class AppViewModel : ViewModel() {
     val userData: StateFlow<UserData> = _userData.asStateFlow()
 
     // ── Wallet ──
-    private val _wallet = MutableStateFlow(WalletState())
-    val wallet: StateFlow<WalletState> = _wallet.asStateFlow()
+    private val _wallet = MutableStateFlow(AppWalletState())
+    val wallet: StateFlow<AppWalletState> = _wallet.asStateFlow()
 
     // ── Current match ──
     private val _currentMatch = MutableStateFlow<MatchData?>(null)
@@ -151,7 +151,7 @@ class AppViewModel : ViewModel() {
                 _authState.value = AuthState.LoggedOut
                 stopAllUserListeners()
                 _userData.value  = UserData()
-                _wallet.value    = WalletState()
+                _wallet.value    = AppWalletState()
                 _unreadCount.value = 0
             }
         }
@@ -194,7 +194,7 @@ class AppViewModel : ViewModel() {
                         isBlocked       = d.getBoolean("isBlocked")      ?: false,
                         walletFrozen    = d.getBoolean("walletFrozen")   ?: false
                     )
-                    _wallet.value = WalletState(
+                    _wallet.value = AppWalletState(
                         balance     = balance,
                         winnings    = winnings,
                         bonusCash   = bonus,
@@ -306,7 +306,7 @@ class AppViewModel : ViewModel() {
                 val balance  = doc.getLong("balance")?.toInt()      ?: 0
                 val winnings = doc.getLong("winnings")?.toInt()     ?: 0
                 val bonus    = doc.getLong("bonusBalance")?.toInt() ?: 0
-                _wallet.value = WalletState(balance, winnings, bonus, balance + winnings + bonus)
+                _wallet.value = AppWalletState(balance, winnings, bonus, balance + winnings + bonus)
             } catch (e: Exception) {
                 Log.e(TAG, "refreshWallet failed: ${e.message}")
             }
@@ -424,7 +424,7 @@ class AppViewModel : ViewModel() {
         stopAllUserListeners()
         auth.signOut()
         _userData.value    = UserData()
-        _wallet.value      = WalletState()
+        _wallet.value      = AppWalletState()
         _unreadCount.value = 0
         _currentMatch.value = null
         _authState.value   = AuthState.LoggedOut

@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -109,38 +109,7 @@ fun ShimmerList(count: Int = 4, height: Int = 120) {
     }
 }
 
-@Composable
-fun LoadingButton(
-    text: String,
-    isLoading: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    color: Color = D11Red,
-    enabled: Boolean = true
-) {
-    val scale by animateFloatAsState(
-        targetValue = if (isLoading) 0.97f else 1f, label = "scale")
-    Button(
-        onClick = { if (!isLoading && enabled) onClick() },
-        modifier = modifier.height(52.dp).scale(scale),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (enabled && !isLoading) color else Color(0xFF444444)),
-        shape = RoundedCornerShape(12.dp),
-        enabled = enabled && !isLoading,
-        elevation = ButtonDefaults.buttonElevation(4.dp)
-    ) {
-        if (isLoading) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(color = D11White,
-                    modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                Text("Please wait...", color = D11White, fontWeight = FontWeight.Bold)
-            }
-        } else {
-            Text(text, color = D11White, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-        }
-    }
-}
+
 
 object CrashHandler {
     fun setup() {
@@ -159,29 +128,6 @@ object CrashHandler {
     }
 }
 
-object ErrorMessages {
-    fun getFirestoreError(msg: String): String = when {
-        msg.contains("permission") -> "Access denied. Please login again."
-        msg.contains("not-found") -> "Data not found. Please refresh."
-        msg.contains("unavailable") -> "Server unavailable. Check internet."
-        else -> "Something went wrong. Please try again."
-    }
-    fun getNetworkError() = "No internet. Please check your connection."
-    fun getBalanceError(required: Int, available: Int) =
-        "Insufficient balance! Need Rs.$required, have Rs.$available."
-    fun getKycError() = "Complete KYC verification to withdraw money."
-    fun getContestFullError() = "Contest is full! Try another contest."
-    fun getAlreadyJoinedError() = "Already joined this contest with this team!"
-}
 
-object ClickGuard {
-    private var lastClickTime = 0L
-    private val minInterval = 1500L
-    fun canClick(): Boolean {
-        val now = System.currentTimeMillis()
-        return if (now - lastClickTime >= minInterval) {
-            lastClickTime = now
-            true
-        } else false
-    }
-}
+
+

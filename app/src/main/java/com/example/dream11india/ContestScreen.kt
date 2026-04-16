@@ -44,14 +44,23 @@ data class ContestData(
 
 data class SavedTeam(
     val id: String = "",
+    val userId: String = "",
+    val matchId: String = "",
+    val matchTitle: String = "",
     val teamNumber: Int = 1,
+    val players: List<String> = emptyList(),
+    val playerNames: List<String> = emptyList(),
+    val captainId: String = "",
     val captainName: String = "",
+    val viceCaptainId: String = "",
     val viceCaptainName: String = "",
     val wkCount: Int = 0,
     val batCount: Int = 0,
     val arCount: Int = 0,
     val bowlCount: Int = 0,
-    val totalPoints: Float = 0f
+    val totalPoints: Float = 0f,
+    val isLocked: Boolean = false,
+    val createdAt: Long = 0L
 )
 
 // ─────────────────────────────────────────────

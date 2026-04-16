@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -233,11 +233,12 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun LiveTabContent(state: LiveScoreUiState) {
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (state.balls.isNotEmpty()) item {
+        val balls = state.balls
+        if (balls.isNotEmpty()) item {
             LiveCard("This Over") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.balls.forEach { BallCircle(it) }
-                    repeat((6 - state.balls.size).coerceAtLeast(0)) {
+                    balls.forEach { BallCircle(it) }
+                    repeat((6 - balls.size).coerceAtLeast(0)) {
                         Box(Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF1E1E1E)).border(1.dp, Color(0xFF333333), CircleShape))
                     }
                 }

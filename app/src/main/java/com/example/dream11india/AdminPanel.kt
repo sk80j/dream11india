@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -42,11 +42,7 @@ data class AdminStats(
     val pendingKyc: Int = 0, val pendingWithdraws: Int = 0
 )
 
-data class PromoCode(
-    val id: String = "", val code: String = "", val type: String = "flat",
-    val value: Int = 0, val maxUses: Int = 100, val usedCount: Int = 0,
-    val expiryDate: Long = 0L, val isActive: Boolean = true
-)
+
 
 data class SupportTicket(
     val id: String = "", val userId: String = "", val userName: String = "",
@@ -1297,7 +1293,7 @@ fun AdminPromoTab() {
             snap?.let {
                 promos = it.documents.map { doc ->
                     PromoCode(
-                        id       = doc.id,
+                        code     = doc.getString("code") ?: doc.id,
                         code     = doc.getString("code") ?: "",
                         type     = doc.getString("type") ?: "flat",
                         value    = doc.getLong("value")?.toInt() ?: 0,
