@@ -144,6 +144,7 @@ data class Player(
 // ─────────────────────────────────────────────
 
 data class PromoCode(
+    val id:         String  = "",
     val code:       String  = "",
     val type:       String  = "flat",
     val value:      Int     = 0,

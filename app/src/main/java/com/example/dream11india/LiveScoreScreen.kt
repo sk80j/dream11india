@@ -232,13 +232,13 @@ private fun InfoRow(label: String, value: String) {
 
 @Composable
 private fun LiveTabContent(state: LiveScoreUiState) {
+    val recentBalls = state.recentBalls
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val balls = state.balls
-        if (balls.isNotEmpty()) item {
+        if (recentBalls.isNotEmpty()) item {
             LiveCard("This Over") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    balls.forEach { BallCircle(it) }
-                    repeat((6 - balls.size).coerceAtLeast(0)) {
+                    recentBalls.forEach { b -> BallCircle(b) }
+                    repeat((6 - recentBalls.size).coerceAtLeast(0)) {
                         Box(Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF1E1E1E)).border(1.dp, Color(0xFF333333), CircleShape))
                     }
                 }

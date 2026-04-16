@@ -217,7 +217,7 @@ fun Dream11App(
             // ── CONTEST ──
             composable(Screen.Contest.route) {
                 ContestScreen(
-                    matchTitle = currentMatch.fullTitle(),
+                    matchTitle = (currentMatch?.fullTitle() ?: ""),
                     userData   = userData,
                     onBack     = { navController.popBackStack() },
                     onJoin     = { navController.navigate(Screen.TeamCreate.route) }
@@ -227,8 +227,8 @@ fun Dream11App(
             // ── TEAM CREATE ──
             composable(Screen.TeamCreate.route) {
                 TeamCreateScreen(
-                    matchTitle  = currentMatch.fullTitle(),
-                    matchId     = currentMatch.id,
+                    matchTitle  = (currentMatch?.fullTitle() ?: ""),
+                    matchId     = (currentMatch?.id ?: ""),
                     onBack      = { navController.popBackStack() },
                     onTeamSaved = {
                         navController.navigate(Screen.TeamPreview.route) {
@@ -241,7 +241,7 @@ fun Dream11App(
             // ── TEAM PREVIEW ── (team1/team2 removed — derived from matchTitle internally)
             composable(Screen.TeamPreview.route) {
                 TeamPreviewScreen(
-                    matchTitle    = currentMatch.fullTitle(),
+                    matchTitle    = (currentMatch?.fullTitle() ?: ""),
                     teamNumber    = 1,
                     onBack        = { navController.popBackStack() },
                     onEditTeam    = { navController.popBackStack() },
@@ -256,8 +256,8 @@ fun Dream11App(
             // ── MY TEAMS ──
             composable(Screen.MyTeams.route) {
                 MyTeamsScreen(
-                    matchId       = currentMatch.id,
-                    matchTitle    = currentMatch.fullTitle(),
+                    matchId       = (currentMatch?.id ?: ""),
+                    matchTitle    = (currentMatch?.fullTitle() ?: ""),
                     onBack        = { navController.popBackStack() },
                     onCreateTeam  = { navController.navigate(Screen.TeamCreate.route) },
                     onJoinContest = { navController.navigate(Screen.Contest.route) },
@@ -268,8 +268,8 @@ fun Dream11App(
             // ── LIVE SCORE ──
             composable(Screen.LiveScore.route) {
                 LiveScoreScreen(
-                    matchId    = currentMatch.id,
-                    matchTitle = "${currentMatch.team1} vs ${currentMatch.team2}",
+                    matchId    = (currentMatch?.id ?: ""),
+                    matchTitle = "${(currentMatch?.team1 ?: "")} vs ${(currentMatch?.team2 ?: "")}",
                     onBack     = { navController.popBackStack() }
                 )
             }
@@ -326,7 +326,7 @@ fun Dream11App(
             // ── LEADERBOARD ──
             composable(Screen.Leaderboard.route) {
                 LeaderboardScreen(
-                    matchTitle = "${currentMatch.team1} vs ${currentMatch.team2}",
+                    matchTitle = "${(currentMatch?.team1 ?: "")} vs ${(currentMatch?.team2 ?: "")}",
                     onBack     = { navController.popBackStack() }
                 )
             }

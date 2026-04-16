@@ -1293,7 +1293,6 @@ fun AdminPromoTab() {
             snap?.let {
                 promos = it.documents.map { doc ->
                     PromoCode(
-                        code     = doc.getString("code") ?: doc.id,
                         code     = doc.getString("code") ?: "",
                         type     = doc.getString("type") ?: "flat",
                         value    = doc.getLong("value")?.toInt() ?: 0,
