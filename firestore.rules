@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    function isSuperAdmin() {
+      return request.auth.uid == "1irz1sRJ3QNeEtUuN70OSWiUBdq2";
+    }
+    function notBlocked() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBlocked != true;
+    }
+
+    // ── Users ──
+    match /users/{uid} {
+      allow read: if isLoggedIn() && (isOwner(uid) || isAdmin());
+      allow create: if isLoggedIn() && isOwner(uid);
+      allow update: if isLoggedIn() && isOwner(uid) && notBlocked();
+      allow delete: if isSuperAdmin();
+
+      match /teams/{teamId} {
+        allow read, write: if isLoggedIn() && isOwner(uid) && notBlocked();
+      }
+    }
+
+    // ── Contests ──
+    match /contests/{contestId} {
+      allow read: if isLoggedIn();
+      allow create, update, delete: if isAdmin() || isSuperAdmin();
+
+      match /leaderboard/{entryId} {
+        allow read: if isLoggedIn();
+        allow write: if isAdmin() || isSuperAdmin();
+      }
+    }
+
+    // ── Joined Contests ──
+    match /joined_contests/{entryId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isLoggedIn() && notBlocked() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Transactions ──
+    match /transactions/{txnId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isLoggedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() || isSuperAdmin();
+    }
+
+    // ── Withdraw Requests ──
+    match /withdrawRequests/{reqId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isLoggedIn() && notBlocked() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Payment Orders ──
+    match /paymentOrders/{orderId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isLoggedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || isSuperAdmin();
+    }
+
+    // ── Payment Requests (Manual UPI) ──
+    match /payment_requests/{reqId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isLoggedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || isSuperAdmin();
+    }
+
+    // ── KYC Requests ──
+    match /kyc_requests/{reqId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isLoggedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || isSuperAdmin();
+    }
+
+    // ── Notifications ──
+    match /notifications/{notifId} {
+      allow read: if isLoggedIn() &&
+        resource.data.userId == request.auth.uid;
+      allow update: if isLoggedIn() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isAdmin() || isSuperAdmin();
+      allow delete: if isAdmin() || isSuperAdmin();
+    }
+
+    // ── App Config ──
+    match /app_config/{docId} {
+      allow read: if isLoggedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Promo Codes ──
+    match /promo_codes/{codeId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin() || isSuperAdmin();
+    }
+
+    // ── Support Tickets ──
+    match /support_tickets/{ticketId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isLoggedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || isSuperAdmin();
+    }
+
+    // ── Admin Logs ──
+    match /admin_logs/{logId} {
+      allow read, write: if isAdmin() || isSuperAdmin();
+    }
+  }
+}

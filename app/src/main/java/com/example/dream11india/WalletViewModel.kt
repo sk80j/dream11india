@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -115,3 +115,4 @@ class WalletViewModel : ViewModel() {
 
     fun resetPayment() { _state.update { it.copy(paymentState = PaymentState.Idle) } }
 }
+

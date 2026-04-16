@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import androidx.compose.ui.graphics.Color
 
@@ -28,6 +28,13 @@ data class UserData(
     val matchesPlayed: Int = 0,
     val teamsCreated: Int = 0,
     val isAdmin: Boolean = false,
+    val bonusBalance: Int = 0,
+    val joinedContests: Int = 0,
+    val totalDeposits: Int = 0,
+    val totalWithdrawals: Int = 0,
+    val referralCode: String = "",
+    val isBlocked: Boolean = false,
+    val walletFrozen: Boolean = false,
     val kycStatus: String = "none",
     val fcmToken: String = ""
 )
