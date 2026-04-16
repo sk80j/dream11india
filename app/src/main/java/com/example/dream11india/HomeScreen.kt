@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -43,9 +43,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // CONSTANTS
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 private val BannerData = listOf(
     Triple(R.string.banner_mega_title,    R.string.banner_mega_sub,    D11Red),
     Triple(R.string.banner_ipl_title,     R.string.banner_ipl_sub,     Color(0xFF1565C0)),
@@ -68,9 +68,9 @@ private data class NavItem(
     val unselectedIcon: ImageVector
 )
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // ROOT SCREEN
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -95,7 +95,7 @@ fun HomeScreen(
         if (!errorMsg.isNullOrBlank()) snackbar.showSnackbar(errorMsg)
     }
 
-    // Derived filtered list — only recomputes when relevant state changes
+    // Derived filtered list � only recomputes when relevant state changes
     val filteredMatches by remember(uiState) {
         derivedStateOf { homeViewModel.filteredMatches(uiState) }
     }
@@ -113,7 +113,7 @@ fun HomeScreen(
                     selectedSport   = uiState.selectedSport,
                     onSportSelected = homeViewModel::selectSport,
                     onProfileClick  = onProfileClick,
-                    onWalletClick   = onWalletClick
+                    onWalletClick = onWalletClick
                 )
 
                 PullToRefreshBox(
@@ -188,7 +188,7 @@ fun HomeScreen(
                                     }
                                 }
 
-                                if (userData.isAdmin) {
+                                if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == "1irz1sRJ3QNeEtUuN70OSWiUBdq2") {
                                     item(key = "admin") { AdminButton(onClick = onAdminClick) }
                                 }
                             }
@@ -206,9 +206,9 @@ fun HomeScreen(
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // HOME TOP BAR
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun HomeTopBar(
     userData:        UserData,
@@ -273,7 +273,6 @@ fun HomeTopBar(
                         tint             = D11Yellow,
                         onClick          = {}
                     )
-                    // Wallet chip
                     Surface(
                         shape    = RoundedCornerShape(20.dp),
                         color    = Color(0xFF2A2A2A),
@@ -284,10 +283,6 @@ fun HomeTopBar(
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                             verticalAlignment     = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Filled.AccountBalanceWallet, null,
-                                tint = D11Green, modifier = Modifier.size(14.dp))
-                            Text("₹${userData.balance}", color = D11White,
-                                fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
                             Icon(Icons.Filled.AddCircle, stringResource(R.string.cd_add_money),
                                 tint = D11Green, modifier = Modifier.size(16.dp))
                         }
@@ -348,9 +343,9 @@ private fun SportTab(label: String, isSelected: Boolean, onClick: () -> Unit) {
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // SEARCH SECTION
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun SearchSection(
     query: String, onChange: (String) -> Unit,
@@ -389,9 +384,9 @@ fun SearchSection(
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // BANNER CAROUSEL
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun BannerCarousel(
     banners: List<Triple<Int, Int, Color>>,
@@ -457,9 +452,9 @@ fun BannerCarousel(
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // FILTER CHIPS (league)
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun FilterChips(
     items: List<String>, selected: String,
@@ -491,9 +486,9 @@ fun FilterChips(
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // STATUS FILTER TABS
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun StatusFilterTabs(selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     Surface(color = D11White, modifier = modifier.fillMaxWidth()) {
@@ -529,9 +524,9 @@ fun StatusFilterTabs(selected: String, onSelect: (String) -> Unit, modifier: Mod
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // MATCH CARD  (fully dynamic data)
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun MatchCard(match: CricMatch, onClick: () -> Unit) {
     val t1Info    = match.teamInfo?.getOrNull(0)
@@ -566,7 +561,7 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
             androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFCDD2)) else null
     ) {
         Column {
-            // ── HEADER ──
+            // -- HEADER --
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .background(if (isLive) Color(0xFFFFF5F5) else Color(0xFFF7F8FA))
@@ -578,7 +573,7 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(Icons.Filled.EmojiEvents, null, tint = D11Yellow,
                         modifier = Modifier.size(14.dp))
-                    Text("T20 · IPL 2026", color = Color(0xFF555555),
+                    Text("T20 � IPL 2026", color = Color(0xFF555555),
                         fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
                 when {
@@ -600,7 +595,7 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
                 }
             }
 
-            // ── TEAMS ──
+            // -- TEAMS --
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -637,7 +632,7 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
                 )
             }
 
-            // ── STATUS TEXT ──
+            // -- STATUS TEXT --
             if (match.status.isNotEmpty()) {
                 Text(match.status,
                     color = if (isLive) D11Red else Color(0xFF777777),
@@ -649,7 +644,7 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
 
             HorizontalDivider(color = Color(0xFFF0F0F0))
 
-            // ── PRIZE + BADGE + CTA ──
+            // -- PRIZE + BADGE + CTA --
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -695,7 +690,7 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
                 }
             }
 
-            // ── FILL PROGRESS — DYNAMIC ──
+            // -- FILL PROGRESS � DYNAMIC --
             val fillFraction = match.filledSpots / 100f
             val fillColor = when {
                 fillFraction > 0.85f -> Color(0xFFE53935)
@@ -720,7 +715,7 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
                 }
             }
 
-            // ── ENTRY FEE ──
+            // -- ENTRY FEE --
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .background(Color(0xFFF7F8FA))
@@ -737,9 +732,9 @@ fun MatchCard(match: CricMatch, onClick: () -> Unit) {
     }
 }
 
-// ─────────────────────────────────────────────
-// TEAM BLOCK — Coil logo with initials fallback
-// ─────────────────────────────────────────────
+// ---------------------------------------------
+// TEAM BLOCK � Coil logo with initials fallback
+// ---------------------------------------------
 @Composable
 private fun TeamBlock(
     shortName: String, fullName: String,
@@ -811,9 +806,9 @@ private fun TeamTextBlock(
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // BOTTOM NAV
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun BottomNav(currentTab: String, onTabChange: (String) -> Unit, modifier: Modifier = Modifier) {
     Surface(color = D11White, shadowElevation = 16.dp, modifier = modifier.fillMaxWidth()) {
@@ -858,9 +853,9 @@ fun BottomNav(currentTab: String, onTabChange: (String) -> Unit, modifier: Modif
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // CARD SKELETON SHIMMER  (matches real card shape)
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 fun CardSkeletonList() {
     val transition = rememberInfiniteTransition(label = "skeleton")
@@ -961,9 +956,9 @@ fun CardSkeletonList() {
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // EMPTY STATE
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 private fun EmptyState(onRefresh: () -> Unit) {
     Column(
@@ -987,9 +982,9 @@ private fun EmptyState(onRefresh: () -> Unit) {
     }
 }
 
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 // ADMIN BUTTON
-// ─────────────────────────────────────────────
+// ---------------------------------------------
 @Composable
 private fun AdminButton(onClick: () -> Unit) {
     Button(
@@ -1004,6 +999,13 @@ private fun AdminButton(onClick: () -> Unit) {
         Text(stringResource(R.string.btn_admin), color = D11White, fontWeight = FontWeight.Bold)
     }
 }
+
+
+
+
+
+
+
 
 
 

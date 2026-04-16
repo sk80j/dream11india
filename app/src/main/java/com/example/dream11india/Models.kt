@@ -51,3 +51,26 @@ val sampleMatches = listOf(
         "Rs.5 Crores","25,000",20,"FREE",
         Color(0xFF0078D4), Color(0xFFFF6600)),
 )
+
+// ===== TRANSACTION =====
+data class Transaction(
+    val id: String = "",
+    val type: String = "",
+    val amount: Int = 0,
+    val description: String = "",
+    val timestamp: Long = 0L,
+    val status: String = "completed",
+    val orderId: String = ""
+)
+
+// ===== WITHDRAW REQUEST =====
+data class WithdrawRequest(
+    val id: String = "",
+    val userId: String = "",
+    val amount: Int = 0,
+    val upiId: String = "",
+    val status: String = "pending",
+    val createdAt: Long = 0L
+)
+
+
