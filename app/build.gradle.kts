@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
@@ -29,8 +29,10 @@ android {
         }
     }
 
+    buildFeatures { buildConfig = true }
     buildTypes {
         release {
+            buildConfigField("String", "CRIC_API_KEY", "\"26fb0ff7-aad3-4882-a9e5-2d4da812e390\"")
             isMinifyEnabled = false
             
             proguardFiles(
@@ -39,6 +41,7 @@ android {
             )
         }
         debug {
+            buildConfigField("String", "CRIC_API_KEY", "\"26fb0ff7-aad3-4882-a9e5-2d4da812e390\"")
             
         }
     }

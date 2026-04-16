@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,13 +10,13 @@ object MatchRepository {
         runCatching {
             val live = CricApiClient.service.getLiveMatches()
             if (live.isSuccessful) {
-                live.body()?.data?.map { CricApiMapper.mapMatch(it) }?.let { all += it }
+                live.body()?.data?.mapNotNull { CricApiMapper.mapMatch(it) }?.let { list -> all.addAll(list) }
             }
         }
         runCatching {
             val upcoming = CricApiClient.service.getUpcomingMatches()
             if (upcoming.isSuccessful) {
-                upcoming.body()?.data?.map { CricApiMapper.mapMatch(it) }?.let { all += it }
+                upcoming.body()?.data?.mapNotNull { CricApiMapper.mapMatch(it) }?.let { list -> all.addAll(list) }
             }
         }
         if (all.isEmpty()) sampleMatches() else all
