@@ -217,10 +217,12 @@ fun Dream11App(
             // ── CONTEST ──
             composable(Screen.Contest.route) {
                 ContestScreen(
-                    matchTitle = (currentMatch?.fullTitle() ?: ""),
-                    userData   = userData,
-                    onBack     = { navController.popBackStack() },
-                    onJoin     = { navController.navigate(Screen.TeamCreate.route) }
+                    matchTitle   = (currentMatch?.fullTitle() ?: ""),
+                    matchId      = (currentMatch?.id ?: ""),
+                    userData     = userData,
+                    onBack       = { navController.popBackStack() },
+                    onJoin       = { navController.popBackStack() },
+                    onCreateTeam = { navController.navigate(Screen.TeamCreate.route) }
                 )
             }
 
@@ -294,16 +296,17 @@ fun Dream11App(
             // ── PROFILE ──
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    userData  = userData,
-                    onBack    = { navController.popBackStack() },
-                    onLogout  = {
+                    userData   = userData,
+                    onBack     = { navController.popBackStack() },
+                    onLogout   = {
                         viewModel.logout()
                         navController.navigate(Screen.Language.route) {
                             popUpTo(0) { inclusive = true }
                         }
                     },
-                    onKYC     = { navController.navigate(Screen.KYC.route) },
-                    onWallet  = { navController.navigate(Screen.Wallet.route) }
+                    onKYC      = { navController.navigate(Screen.KYC.route) },
+                    onWallet   = { navController.navigate(Screen.Wallet.route) },
+                    onMyTeams  = { navController.navigate(Screen.MyTeams.route) }
                 )
             }
 
