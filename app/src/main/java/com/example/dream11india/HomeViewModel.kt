@@ -1,7 +1,9 @@
-package com.example.dream11india
+﻿package com.example.dream11india
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,10 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-// ─────────────────────────────────────────────
-// UI STATE
-// ─────────────────────────────────────────────
 sealed class MatchUiState {
     object Loading : MatchUiState()
     data class Success(val matches: List<CricMatch>) : MatchUiState()
@@ -21,105 +21,108 @@ sealed class MatchUiState {
 }
 
 data class HomeUiState(
-    val matchState:     MatchUiState = MatchUiState.Loading,
-    val selectedLeague: String       = "All",
-    val selectedFilter: String       = "All",
-    val selectedSport:  String       = "Cricket",
-    val searchQuery:    String       = "",
-    val isRefreshing:   Boolean      = false,
-    val bannerIndex:    Int          = 0
+    val matchState:     MatchUiState  = MatchUiState.Loading,
+    val selectedLeague: String        = "All",
+    val selectedFilter: String        = "All",
+    val selectedSport:  String        = "Cricket",
+    val searchQuery:    String        = "",
+    val isRefreshing:   Boolean       = false,
+    val bannerIndex:    Int           = 0,
+    val joinedMatchIds: Set<String>   = emptySet()
 )
 
-// ─────────────────────────────────────────────
-// VIEWMODEL
-// ─────────────────────────────────────────────
 class HomeViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private var refreshJob:  Job? = null
-    private var pollingJob:  Job? = null
-    private var bannerJob:   Job? = null
+    private var refreshJob: Job? = null
+    private var pollingJob: Job? = null
+    private var bannerJob:  Job? = null
 
     init {
         loadMatches(showLoading = true)
+        loadJoinedMatchIds()
         startPolling()
         startBannerRotation()
     }
 
-    // ── Public actions ───────────────────────
+    fun refresh() { loadMatches(showLoading = false, isManualRefresh = true) }
+    fun selectLeague(league: String) { _uiState.update { it.copy(selectedLeague = league) } }
+    fun selectFilter(filter: String) { _uiState.update { it.copy(selectedFilter = filter) } }
+    fun selectSport(sport: String)   { _uiState.update { it.copy(selectedSport = sport) } }
+    fun updateSearch(query: String)  { _uiState.update { it.copy(searchQuery = query) } }
+    fun clearSearch()                { _uiState.update { it.copy(searchQuery = "") } }
 
-    fun refresh() {
-        loadMatches(showLoading = false, isManualRefresh = true)
+    // ── Joined match IDs from Firebase ──
+    private fun loadJoinedMatchIds() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        FirebaseFirestore.getInstance()
+            .collection("joined_contests")
+            .whereEqualTo("userId", uid)
+            .addSnapshotListener { snap, _ ->
+                snap?.let {
+                    val ids = it.documents.mapNotNull { d -> d.getString("matchId") }.toSet()
+                    _uiState.update { s -> s.copy(joinedMatchIds = ids) }
+                }
+            }
     }
 
-    fun selectLeague(league: String) {
-        _uiState.update { it.copy(selectedLeague = league) }
-    }
-
-    fun selectFilter(filter: String) {
-        _uiState.update { it.copy(selectedFilter = filter) }
-    }
-
-    fun selectSport(sport: String) {
-        _uiState.update { it.copy(selectedSport = sport) }
-    }
-
-    fun updateSearch(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
-    }
-
-    fun clearSearch() {
-        _uiState.update { it.copy(searchQuery = "") }
-    }
-
-    // ── Derived filtered list ────────────────
+    // ── Filtered matches — Dream11 rules ──
     fun filteredMatches(state: HomeUiState): List<CricMatch> {
         val raw = (state.matchState as? MatchUiState.Success)?.matches ?: return emptyList()
 
         return raw
+            .filter { it.fantasyEnabled }
             .let { list ->
                 val q = state.searchQuery.trim()
                 if (q.isBlank()) list
-                else list.filter {
-                    it.name.contains(q, true) ||
-                            it.teams.any { t -> t.contains(q, true) }
-                }
+                else list.filter { it.name.contains(q, true) || it.teams.any { t -> t.contains(q, true) } }
             }
             .let { list ->
                 when (state.selectedLeague) {
-                    "IPL" -> list.filter { m ->
-                        m.teams.any { t ->
-                            IPL_TEAMS.any { t.contains(it, true) }
-                        }
-                    }
-                    "T20"  -> list.filter { it.status.contains("T20",  ignoreCase = true) }
-                    "ODI"  -> list.filter { it.status.contains("ODI",  ignoreCase = true) }
-                    "Test" -> list.filter { it.status.contains("Test", ignoreCase = true) }
+                    "IPL"  -> list.filter { m -> m.teams.any { t -> IPL_TEAMS.any { t.contains(it, true) } } }
+                    "T20"  -> list.filter { it.matchType.contains("T20",  ignoreCase = true) }
+                    "ODI"  -> list.filter { it.matchType.contains("ODI",  ignoreCase = true) }
+                    "Test" -> list.filter { it.matchType.contains("Test", ignoreCase = true) }
                     else   -> list
                 }
             }
             .let { list ->
                 when (state.selectedFilter) {
-                    "Live"      -> list.filter {  it.matchStarted && !it.matchEnded }
+                    // Upcoming — not started, show all
                     "Upcoming"  -> list.filter { !it.matchStarted }
-                    "Completed" -> list.filter {  it.matchEnded }
-                    else        -> list
+                    // Live — only matches user joined
+                    "Live"      -> list.filter { it.matchStarted && !it.matchEnded && state.joinedMatchIds.contains(it.id) }
+                    // Completed — only matches user joined
+                    "Completed" -> list.filter { it.matchEnded && state.joinedMatchIds.contains(it.id) }
+                    // All — upcoming + joined live/completed
+                    else -> list.filter { match ->
+                        when {
+                            !match.matchStarted -> true
+                            else -> state.joinedMatchIds.contains(match.id)
+                        }
+                    }
                 }
             }
     }
 
-    // ── Private helpers ──────────────────────
+    // ── Button label per match ──
+    fun getMatchButtonLabel(match: CricMatch, joinedMatchIds: Set<String>): String {
+        return when {
+            match.matchEnded                          -> "View Results"
+            match.matchStarted                        -> "View Contest"
+            joinedMatchIds.contains(match.id)         -> "View Contest"
+            else                                      -> "Play"
+        }
+    }
 
     private fun loadMatches(showLoading: Boolean, isManualRefresh: Boolean = false) {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
             if (showLoading) _uiState.update { it.copy(matchState = MatchUiState.Loading) }
             if (isManualRefresh) _uiState.update { it.copy(isRefreshing = true) }
-
             val result = runCatching { MatchRepository.fetchMatches() }
-
             _uiState.update { state ->
                 state.copy(
                     matchState   = result.fold(
