@@ -1,4 +1,4 @@
-﻿package com.example.dream11india
+package com.example.dream11india
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -73,7 +73,7 @@ class HomeViewModel : ViewModel() {
         val raw = (state.matchState as? MatchUiState.Success)?.matches ?: return emptyList()
 
         return raw
-            .filter { it.fantasyEnabled }
+            
             .let { list ->
                 val q = state.searchQuery.trim()
                 if (q.isBlank()) list

@@ -158,7 +158,7 @@ fun HomeScreen(
 
 @Composable
 fun HomeTopBar(userData: UserData, selectedSport: String, onSportSelected: (String) -> Unit, onProfileClick: () -> Unit, onWalletClick: () -> Unit) {
-    val sportTabs = listOf("Cricket","Football","Kabaddi","Basketball")
+    val sportTabs = listOf("Cricket")
     Surface(color=Color(0xFF111111), shadowElevation=8.dp) {
         Column {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=16.dp,vertical=10.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {

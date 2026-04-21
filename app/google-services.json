@@ -7,25 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1066913320483:android:d852bc4f03c987b5676b96",
-        "android_client_info": {
-          "package_name": "com.dream11indiano1"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyC-z3VmxzDMAGM2vcPkf_T_GiA8XuA4efs"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:1066913320483:android:e95898c23732143b676b96",
         "android_client_info": {
           "package_name": "com.example.dream11india"
