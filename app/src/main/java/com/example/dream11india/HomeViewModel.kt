@@ -1,4 +1,4 @@
-package com.example.dream11india
+﻿package com.example.dream11india
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 sealed class MatchUiState {
     object Loading : MatchUiState()
@@ -21,14 +20,14 @@ sealed class MatchUiState {
 }
 
 data class HomeUiState(
-    val matchState:     MatchUiState  = MatchUiState.Loading,
-    val selectedLeague: String        = "All",
-    val selectedFilter: String        = "All",
-    val selectedSport:  String        = "Cricket",
-    val searchQuery:    String        = "",
-    val isRefreshing:   Boolean       = false,
-    val bannerIndex:    Int           = 0,
-    val joinedMatchIds: Set<String>   = emptySet()
+    val matchState:     MatchUiState = MatchUiState.Loading,
+    val selectedLeague: String       = "All",
+    val selectedFilter: String       = "All",
+    val selectedSport:  String       = "Cricket",
+    val searchQuery:    String       = "",
+    val isRefreshing:   Boolean      = false,
+    val bannerIndex:    Int          = 0,
+    val joinedMatchIds: Set<String>  = emptySet()
 )
 
 class HomeViewModel : ViewModel() {
@@ -54,80 +53,89 @@ class HomeViewModel : ViewModel() {
     fun updateSearch(query: String)  { _uiState.update { it.copy(searchQuery = query) } }
     fun clearSearch()                { _uiState.update { it.copy(searchQuery = "") } }
 
-    // ── Joined match IDs from Firebase ──
     private fun loadJoinedMatchIds() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         FirebaseFirestore.getInstance()
             .collection("joined_contests")
             .whereEqualTo("userId", uid)
             .addSnapshotListener { snap, _ ->
-                snap?.let {
-                    val ids = it.documents.mapNotNull { d -> d.getString("matchId") }.toSet()
-                    _uiState.update { s -> s.copy(joinedMatchIds = ids) }
-                }
+                val ids = snap?.documents?.mapNotNull { d -> d.getString("matchId") }?.toSet() ?: emptySet()
+                _uiState.update { it.copy(joinedMatchIds = ids) }
             }
     }
 
-    // ── Filtered matches — Dream11 rules ──
+    // ── Main filter function — called from UI ──
     fun filteredMatches(state: HomeUiState): List<CricMatch> {
-        val raw = (state.matchState as? MatchUiState.Success)?.matches ?: return emptyList()
+        val raw = (state.matchState as? MatchUiState.Success)?.matches
+            ?: return emptyList()
+
+        if (raw.isEmpty()) return emptyList()
 
         return raw
-            
+            // 1. Search filter
             .let { list ->
                 val q = state.searchQuery.trim()
                 if (q.isBlank()) list
-                else list.filter { it.name.contains(q, true) || it.teams.any { t -> t.contains(q, true) } }
+                else list.filter {
+                    it.name.contains(q, ignoreCase = true) ||
+                    it.teams.any { t -> t.contains(q, ignoreCase = true) }
+                }
             }
+            // 2. League filter
             .let { list ->
                 when (state.selectedLeague) {
-                    "IPL"  -> list.filter { m -> m.teams.any { t -> IPL_TEAMS.any { t.contains(it, true) } } }
-                    "T20"  -> list.filter { it.matchType.contains("T20",  ignoreCase = true) }
-                    "ODI"  -> list.filter { it.matchType.contains("ODI",  ignoreCase = true) }
-                    "Test" -> list.filter { it.matchType.contains("Test", ignoreCase = true) }
+                    "IPL"  -> list.filter { m ->
+                        m.name.contains("IPL", ignoreCase = true) ||
+                        m.teams.any { t -> IPL_TEAMS.any { ipl -> t.contains(ipl, ignoreCase = true) } }
+                    }
+                    "T20"  -> list.filter { it.matchType.contains("t20",  ignoreCase = true) }
+                    "ODI"  -> list.filter { it.matchType.contains("odi",  ignoreCase = true) }
+                    "Test" -> list.filter { it.matchType.contains("test", ignoreCase = true) }
                     else   -> list
                 }
             }
+            // 3. Status filter
             .let { list ->
                 when (state.selectedFilter) {
-                    // Upcoming — not started, show all
+                    "Live"      -> list.filter { it.matchStarted && !it.matchEnded }
                     "Upcoming"  -> list.filter { !it.matchStarted }
-                    // Live — only matches user joined
-                    "Live"      -> list.filter { it.matchStarted && !it.matchEnded && state.joinedMatchIds.contains(it.id) }
-                    // Completed — only matches user joined
-                    "Completed" -> list.filter { it.matchEnded && state.joinedMatchIds.contains(it.id) }
-                    // All — upcoming + joined live/completed
-                    else -> list.filter { match ->
-                        when {
-                            !match.matchStarted -> true
-                            else -> state.joinedMatchIds.contains(match.id)
-                        }
-                    }
+                    "Completed" -> list.filter { it.matchEnded }
+                    else        -> list  // "All" — show everything
                 }
             }
     }
 
-    // ── Button label per match ──
-    fun getMatchButtonLabel(match: CricMatch, joinedMatchIds: Set<String>): String {
-        return when {
-            match.matchEnded                          -> "View Results"
-            match.matchStarted                        -> "View Contest"
-            joinedMatchIds.contains(match.id)         -> "View Contest"
-            else                                      -> "Play"
-        }
+    // My Matches — only joined
+    fun myMatches(state: HomeUiState): List<CricMatch> {
+        val raw = (state.matchState as? MatchUiState.Success)?.matches ?: return emptyList()
+        return raw.filter { state.joinedMatchIds.contains(it.id) }
+    }
+
+    fun getMatchButtonLabel(match: CricMatch, joinedMatchIds: Set<String>): String = when {
+        match.matchEnded                      -> "View Results"
+        match.matchStarted                    -> "View Contest"
+        joinedMatchIds.contains(match.id)     -> "View Contest"
+        else                                  -> "Play"
     }
 
     private fun loadMatches(showLoading: Boolean, isManualRefresh: Boolean = false) {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            if (showLoading) _uiState.update { it.copy(matchState = MatchUiState.Loading) }
-            if (isManualRefresh) _uiState.update { it.copy(isRefreshing = true) }
+            if (showLoading)      _uiState.update { it.copy(matchState = MatchUiState.Loading) }
+            if (isManualRefresh)  _uiState.update { it.copy(isRefreshing = true) }
+
             val result = runCatching { MatchRepository.fetchMatches() }
+
+            android.util.Log.d("HomeVM", "Fetched: ${result.getOrNull()?.size} matches, err: ${result.exceptionOrNull()?.message}")
+
             _uiState.update { state ->
                 state.copy(
-                    matchState   = result.fold(
-                        onSuccess = { MatchUiState.Success(it) },
-                        onFailure = { MatchUiState.Error(it.message ?: "Unknown error") }
+                    matchState = result.fold(
+                        onSuccess = { matches ->
+                            if (matches.isEmpty()) MatchUiState.Error("No matches available")
+                            else MatchUiState.Success(matches)
+                        },
+                        onFailure = { MatchUiState.Error(it.message ?: "Failed to load matches") }
                     ),
                     isRefreshing = false
                 )
@@ -163,7 +171,7 @@ class HomeViewModel : ViewModel() {
     }
 
     companion object {
-        const val BANNER_COUNT = 3
+        const val BANNER_COUNT = 5
         val IPL_TEAMS = listOf(
             "Mumbai", "Chennai", "Royal", "Kolkata",
             "Delhi", "Punjab", "Rajasthan", "Sunrisers", "Gujarat", "Lucknow"

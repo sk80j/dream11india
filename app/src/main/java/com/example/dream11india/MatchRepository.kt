@@ -9,65 +9,15 @@ object MatchRepository {
         runCatching {
             val live = CricApiClient.service.getLiveMatches()
             if (live.isSuccessful) {
-                live.body()?.data?.mapNotNull { CricApiMapper.mapMatch(it) }?.let { list -> all.addAll(list) }
+                live.body()?.data?.mapNotNull { CricApiMapper.mapMatch(it) }?.let { all.addAll(it) }
             }
         }
         runCatching {
             val upcoming = CricApiClient.service.getUpcomingMatches()
             if (upcoming.isSuccessful) {
-                upcoming.body()?.data?.mapNotNull { CricApiMapper.mapMatch(it) }?.let { list -> all.addAll(list) }
+                upcoming.body()?.data?.mapNotNull { CricApiMapper.mapMatch(it) }?.let { all.addAll(it) }
             }
         }
-        runCatching {
-            val recent = CricApiClient.service.getRecentMatches()
-            if (recent.isSuccessful) {
-                recent.body()?.data?.mapNotNull { CricApiMapper.mapMatch(it) }?.let { list -> all.addAll(list) }
-            }
-        }
-        if (all.isEmpty()) sampleMatches() else all.distinctBy { it.id }
+        all.distinctBy { it.id }
     }
-
-    fun sampleMatches(): List<CricMatch> = listOf(
-        CricMatch(id="1", name="RR vs MI",
-            status="RR need 45 runs in 30 balls",
-            venue="Sawai Mansingh Stadium, Jaipur",
-            date="2026-04-14T14:00:00",
-            teams=listOf("Rajasthan Royals","Mumbai Indians"),
-            teamInfo=listOf(TeamInfo("Rajasthan Royals","RR",""), TeamInfo("Mumbai Indians","MI","")),
-            score=listOf(Score(186,5,20.0,"MI Innings"), Score(142,3,14.0,"RR Innings")),
-            matchStarted=true, matchEnded=false, matchType="T20",
-            prizePool="Rs.1 Crore", totalSpots="1,00,000", filledSpots=88, badge="MEGA", entryFee="Rs.49"),
-        CricMatch(id="2", name="CSK vs RCB",
-            status="Today, 7:30 PM",
-            venue="MA Chidambaram Stadium, Chennai",
-            date="2026-04-18T14:00:00",
-            teams=listOf("Chennai Super Kings","Royal Challengers"),
-            teamInfo=listOf(TeamInfo("Chennai Super Kings","CSK",""), TeamInfo("Royal Challengers","RCB","")),
-            score=null, matchStarted=false, matchEnded=false, matchType="T20",
-            prizePool="Rs.50 Crores", totalSpots="50,000", filledSpots=62, badge="MEGA", entryFee="Rs.49"),
-        CricMatch(id="3", name="KKR vs DC",
-            status="Tomorrow, 3:30 PM",
-            venue="Eden Gardens, Kolkata",
-            date="2026-04-19T10:00:00",
-            teams=listOf("Kolkata Knight Riders","Delhi Capitals"),
-            teamInfo=listOf(TeamInfo("Kolkata Knight Riders","KKR",""), TeamInfo("Delhi Capitals","DC","")),
-            score=null, matchStarted=false, matchEnded=false, matchType="T20",
-            prizePool="Rs.25 Crores", totalSpots="75,000", filledSpots=41, badge="GUARANTEED", entryFee="Rs.25"),
-        CricMatch(id="4", name="PBKS vs SRH",
-            status="Tomorrow, 7:30 PM",
-            venue="PCA Stadium, Mohali",
-            date="2026-04-19T14:00:00",
-            teams=listOf("Punjab Kings","Sunrisers Hyderabad"),
-            teamInfo=listOf(TeamInfo("Punjab Kings","PBKS",""), TeamInfo("Sunrisers Hyderabad","SRH","")),
-            score=null, matchStarted=false, matchEnded=false, matchType="T20",
-            prizePool="Rs.10 Crores", totalSpots="30,000", filledSpots=55, badge="FREE", entryFee="FREE"),
-        CricMatch(id="5", name="GT vs LSG",
-            status="15 Apr, 7:30 PM",
-            venue="Narendra Modi Stadium, Ahmedabad",
-            date="2026-04-20T14:00:00",
-            teams=listOf("Gujarat Titans","Lucknow Super Giants"),
-            teamInfo=listOf(TeamInfo("Gujarat Titans","GT",""), TeamInfo("Lucknow Super Giants","LSG","")),
-            score=null, matchStarted=false, matchEnded=false, matchType="T20",
-            prizePool="Rs.75 Crores", totalSpots="2,00,000", filledSpots=30, badge="MEGA", entryFee="Rs.99")
-    )
 }
